@@ -2469,3 +2469,52 @@ too narrow a window. (2) Short term: 37 dB puts the weakest daytime packet at
 correlator costs nothing in range (12-bit ADC into a 16-bit input:
 2047 x 16 = 32752) and removed every replayed miss. The gain was returned to
 25 dB after the runs.
+
+### The correlator's working window, and why M10 is not a digital gain -- 2026-09-27
+
+The plan was M10 = a x16 left shift (with saturation) in front of the detector
+correlator. Two things killed it before a build:
+
+- **The local CI failed with it.** The testbenches drive amplitude 1024; x16
+  gives 16384, and the completion testbench found no packet at 4 of 5 phases
+  (`packet starts=0`). The M10 RTL did detect all six raw weak misses at all 15
+  phases tried, with the joint estimate applied (`precise=1`).
+- **The window has a ceiling as well as a floor.** A strong recording of
+  2026-09-25 (raw peak 169) scaled to peaks of 1200/2400/4800/9600/15000/24000
+  through the M9 RTL, 7 phases each: detected at 7/7, 7/7, 7/7, 6/7, 4/7, 4/7.
+  With the floor at ~20 LSB the generated correlator works from about **20 to
+  5000 input LSB, ~48 dB**.
+
+The reason is in the generated types (`model/simulink/+lora_sim/fixed_point_types.m`):
+every boundary is 16 bits with one guard bit over the measured range of the
+golden vectors, Floor rounding, Saturate on overflow. The input is
+`sfix16_En10` -- the model's unit amplitude is 1024 LSB, which is what the
+testbenches drive -- and `magnitudeSquared` is `ufix16_E5`. The board's packets
+at 25 dB were 9..220 LSB: the receiver had been running at the bottom of its
+window all along.
+
+So a gain in the PL only moves the signal inside the same window; so does the
+AD9361 gain, and at 25 dB the AD9361's noise (~0.9 LSB rms) already exceeds the
+ADC's quantization noise, so the digital shift buys nothing the analog gain
+does not. x16 would have pushed today's 37 dB packets (up to 680 LSB) to 10880,
+over the ceiling. **Operating point: 37 dB** (packets 36..880 LSB on this bench,
+inside the window at both ends); `restore_rx_profile.sh` now defaults to 37
+(was 50). The M10 change was reverted and never committed. Widening the window
+itself means regenerating the correlator with wider `magnitudeSquared`,
+spectrum sum and confidence (MATLAB R2025a with HDL Coder is installed).
+
+**Series `2026-09-27-clg400-m9-gain37`** (37 dB, 06:16-13:12 UTC, 1400
+attempts): 1389 captured, **0 detection misses**, CRC 1379/1389; straddle 77
+(CRC 73/77), split 5, early-sync 1; 3 recordings without a packet (send
+timing), 8 transmitter-side failures; no crossing drop. Packet peaks 520..680
+LSB, none at the ADC rail.
+
+**CRC failures are a separate mechanism**, ~0.4 % over all M9 series. They do
+not follow the level: the joint triplet's log2 peak is 27.9..28.4 for the
+failures against a median of 28.2 for the good ones (saturation at 32). With
+the reference model derotated by the joint CFO (as M9 does), 3 of the 12
+examined decode: 083257Z on the board's grid (it is a weak packet, 118 burst
+ratio: truncated payload windows), 081344Z and 101022Z only 1..6 samples off
+the board's grid (a joint-estimate error). The other nine decode at no grid
+offset even derotated. At 37 dB the straddle path is over-represented: 4 of
+its 77 packets failed against 6 of the other 1312.

@@ -57,7 +57,13 @@ DEVICE=${DEVICE:-/sys/bus/iio/devices/iio:device0}
 RATE=${RATE:-1000000}
 LO=${LO:-868100000}
 BANDWIDTH=${BANDWIDTH:-200000}
-GAIN=${GAIN:-50}
+# RX gain puts the packet inside the generated correlator's working window,
+# about 20..5000 input LSB (its 16-bit |X|^2 truncates weak windows to zero
+# and saturates strong ones; measured by RTL replay 2026-09-27). On the
+# ~1 m bench the packet peak swings ~15 dB with people in the room: at 25 dB
+# it fell to 9..16 LSB and 1 in 5 of the weakest packets was missed; 50 dB
+# clipped the ADC (2026-09-19). 37 dB gave 36..880 LSB and 0 misses in 1245.
+GAIN=${GAIN:-37}
 PARK_RATE=3000000
 FIR_TAPS=128
 
