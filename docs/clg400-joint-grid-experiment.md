@@ -2389,3 +2389,83 @@ Together with series500: **0 misses in 732 packets**, CRC 732/732. Wilson 95 %
 upper bound 0.52 % (M7 had 5/798 = 0.63 %); Fisher exact, one-sided, against
 M8 (6/492) p = 0.004, against M7 p = 0.04. Issue #31 closed. The early-sync
 path has not fired on the board yet.
+
+## M9: detection misses come back on a weak signal -- 2026-09-26/27
+
+**Day series `2026-09-26-clg400-m9-day1400`** (06:33-13:40 UTC, 1400
+attempts, `--keep-iq anomalies`): 1381 captured, CRC 1377/1381, **7 detection
+misses**, 1 recording without a packet, 11 transmitter-side failures. Rescue
+paths: straddle 64, split 23, **early-sync 4** (its first firings on the board),
+all CRC valid. No crossing drop.
+
+A miss here is a `read_trace` failure with `captured=0`, the joint page empty,
+and page 0 still holding the *previous* packet (its coarse time and sequence
+number): the programmable logic never detected this attempt's packet. At first
+I read the ring's one `detected` entry as this packet's; ordering the ring by
+sample count (the write pointer, not `newest_index`, is where the counts jump
+back) puts it before the attempt's own re-arm, i.e. it is the previous packet.
+
+**The signal dropped ~10 dB overnight; nothing on the bench moved.** Noise
+power of the recordings is identical in all three series (0.82 LSB^2); the
+packet's power fell from 38-40 dB to 28 dB above it. At night (21:10-22:40
+UTC) the burst ratio stayed at 6600-6700 within a few percent; through the day
+it moved in steps between flat plateaus (530-590 for 30 minutes, then
+1300-1700, then 12500 at 10:30 UTC): indoor multipath with people in the room.
+The receive configuration read back unchanged (25 dB manual, LO 868.1 MHz);
+the transmit profile is byte-identical.
+
+| Burst ratio | captured | misses | CRC fail |
+|---|---|---|---|
+| < 300 | 28 | 7 | 1 |
+| 300-1000 | 371 | 1 | 0 |
+| 1000-3000 | 318 | 0 | 2 |
+| >= 3000 | 664 | 0 | 1 |
+
+**Mechanism.** The packet peak of the missed recordings is 9-16 LSB of 2047
+(the day's good ones 23-54, the evening's 57-169). The decision ring shows the
+preamble with holes: `29 x6, ., 29 x4`, `100 x11, ., 108, 116` -- windows with
+confidence 0 in the middle of the packet. The correlator's
+`peakMagnitudeSquared` is a 16-bit quantity scaled for strong input; where a
+window holds a split peak or straddles two chirps each lobe carries about a
+quarter of the power, and at this level it truncates to exactly zero. The
+decision becomes bin 0 and breaks the run, and the M7 silence guard (every
+window's peak non-zero) refuses the rescue paths too. The radio link itself is
+fine: 28 dB SNR at worst, where SF7 decodes at -7 dB.
+
+RTL replay of six misses (M9 RTL, 28 phases, step 37): 3 detected at no phase,
+the others at 2-13 of 28. The same recordings scaled x16 are detected at all 28
+phases, x4 at all 15 phases tried; three strong recordings of 2026-09-25 scaled
+x16 are detected at every phase (no overflow). The seventh miss (080352Z) has
+no preamble in the recording at all: the burst is 42 ms instead of ~77 ms and
+starts with payload symbols (dechirped bins wander 0..4, 121..127): a fade over
+the preamble, not a receiver fault.
+
+The four CRC failures: three do not decode with the reference model at any
+grid correction either (072121Z agrees with the model on only 9 of 24 raw bins;
+083257Z is at burst ratio 118); one (101022Z) decodes with the model at -3
+while the PL applied -1, a joint-estimate error of 2 samples.
+
+**Gain experiment on the board.** RX gain set live (sysfs, manual, both
+channels). A first pair at 11 and 23 dB (300 attempts each, evening) gave 0
+misses in both: the evening signal was ~22 dB stronger than the weak day
+periods (peak 33-48 LSB at 11 dB). The decisive run interleaved 12 blocks of 25
+attempts at **0 dB** (peak 9-14 LSB, the level of the day misses) and **12
+dB**, so a change in the room hits both arms alike:
+
+| | 0 dB | 12 dB |
+|---|---|---|
+| packets on air | 295 | 298 |
+| detection misses | **194 (66 %)** | **0** |
+| CRC of captured | 101/101 | 298/298 |
+
+By packet peak: 9-11 LSB 5 of 5 missed, 12-14 LSB 189 of 193 missed, 30 LSB
+and more none missed. The receiver needs about 20 LSB of packet peak.
+
+**Consequences.** (1) At 25 dB this bench swings from ~15 to ~190 LSB within a
+day, and at 50 dB it clipped at the rail (2026-09-19): analog gain alone leaves
+too narrow a window. (2) Short term: 37 dB puts the weakest daytime packet at
+~60 LSB and the strongest seen at 25 dB (219) at ~870, both inside range.
+(3) The fix belongs in the PL: a digital gain of x16 in front of the
+correlator costs nothing in range (12-bit ADC into a 16-bit input:
+2047 x 16 = 32752) and removed every replayed miss. The gain was returned to
+25 dB after the runs.
