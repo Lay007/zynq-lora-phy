@@ -2518,3 +2518,63 @@ ratio: truncated payload windows), 081344Z and 101022Z only 1..6 samples off
 the board's grid (a joint-estimate error). The other nine decode at no grid
 offset even derotated. At 37 dB the straddle path is over-represented: 4 of
 its 77 packets failed against 6 of the other 1312.
+
+## M10: the correlator regenerated at WordLength 20 (#32) -- 2026-09-27/28
+
+**Why the window was where it was.** `run_fixed_point_sweep` chose 16 bits in
+M2 by driving the golden vectors at one level, and `run_real_iq_regression`
+normalises every window to unit RMS before replaying it: neither ever varied
+the input level, so the dynamic range was never measured. The integer bits come
+from range analysis (plus one guard bit), the word length only adds fraction
+bits -- so more word length lowers the floor and leaves the ceiling alone.
+
+**Regeneration.** `run_hdl_generation(WordLength=20)` (MATLAB R2025a, HDL Coder,
+~8 min; now the default). Ports become `sfix20_En14` in, `ufix20_*` out;
+`fft_correlator_route_top` keeps the 16-bit sample port (a raw sample enters as
+`{x, 4'b0}`, the same value) and returns confidence and spectrum sum at their
+old scale (top 16 bits); the peak keeps "zero means exactly zero" (a peak the
+16-bit core would have truncated reads 1).
+
+RTL replay (7 phases each, `--no-joint`):
+
+| input peak (LSB) | 5 | 10 | 20 | 40 | 1200..4800 | 9600 | 15000 | 24000 |
+|---|---|---|---|---|---|---|---|---|
+| 16-bit core | 0/7 | 1/7 | 7/7 | 7/7 | 7/7 | 6/7 | 4/7 | 4/7 |
+| 20-bit core | **7/7** | **7/7** | 7/7 | 7/7 | 7/7 | 6/7 | 4/7 | 4/7 |
+
+The six weak board misses of 2026-09-26 are detected at every phase on the raw
+recordings. Noise-only board recordings (pre-burst noise at 25 and 37 dB, 4 x
+250k samples each): 0 detections on either core -- the M7 silence guard stayed
+harmless although noise no longer truncates to exactly zero.
+
+**Timing.** The first 20-bit build missed by 0.446 ns (77 endpoints), both paths
+inside the core and both the ones that had been thin at 16 bits (+0.002..0.025
+ns): FFT_N -> ScaleByM -> MagnitudeSquared -> Confidence divisor (28 levels, 17
+carry chains) and resetIn -> Multiply -> AccumDelay. `run_hdl_generation` now
+sets output pipelines on Multiply (1), ScaleByM (1), MagnitudeSquared (2) and
+GuardedSum (1) -- outside the AccumSum/AccumDelay and SpectrumSum/SpectrumDelay
+loops, so the function is unchanged and HDL Coder balances the parallel paths;
+core latency 42 -> 47. Result: **WNS +0.220 ns**, the best margin of the
+project (M9 +0.018), worst path now inside axi_ad9361; LUT 39154 (73.6 %), DSP
+102, BRAM 86. The pipelined core replays identically (5/10/4800 at 7/7, 9600 at
+6/7, the weak misses at 7/7). CI (smoke 20 testbenches, completion 5 phases x
+CFO 0/+-, multi-packet) all pass. Commit `b054731`, image `27f50b0b...`
+(bitstreams/lora-clg400-m10-wide-correlator).
+
+The ci_local runner's joint-grid jobs hung twice with no simulator process
+left (once across a sleep, once not); running each `vvp` of those jobs directly
+from a compiled binary completed normally -- a runner problem, not a design one.
+
+**On the board.** Deployed by the operator, loaded by a software `reboot`
+(u-boot loads `system_top.bit` from the SD card on every boot, so no power
+cycle is needed), profile restored at the new default 37 dB, smoke PASS; drop
+count 1883 after boot, unchanged by the profile restore. Probe at 37 dB: 9/9
+CRC valid. The decisive repeat of the M9 experiment -- 12 blocks of 25
+attempts, 0 dB and 12 dB interleaved -- at 225/224 attempts:
+
+| | M9, 0 dB | **M10, 0 dB** | M10, 12 dB |
+|---|---|---|---|
+| packets on air | 295 | 221 | 223 |
+| detection misses | 194 (66 %) | **0** | 0 |
+| CRC of captured | 101/101 | 221/221 | 223/223 |
+| packet peak (median, kept IQ) | 12 LSB | 11 LSB | 40 LSB |
