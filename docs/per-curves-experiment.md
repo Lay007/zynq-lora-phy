@@ -1,0 +1,181 @@
+# LoRa packet error rate against SNR: bench experiment
+
+Status: 2026-09-28. The ideal curves are computed; the bench tools are built and
+tested piecewise (see *State*); the first measured curve waits for the cable
+set-up below.
+
+## Goal
+
+Packet error rate (PER) against SNR for every LoRa mode the parts can do, for
+three receivers on **the same signal**, next to the ideal:
+
+| Receiver | What it is |
+|---|---|
+| ideal | Monte Carlo model: perfect timing, no CFO, non-coherent FFT decision, the project's packet decoder (`tools/lora_per_ideal.py`) |
+| PL | this project's receiver in the CLG400 programmable logic (M10 image), decoded by the same packet decoder |
+| LR1121 | LILYGO T3-S3 V1.2 running `firmware/lilygo-t3s3-lr1121-rx` |
+| SX1262 | Heltec WiFi LoRa 32 V4 running `firmware/heltec-v4-sx1262-rx` |
+
+Modes: SF 7..12, BW 125/250/500 kHz, CR 4/5..4/8; 32-byte payload, explicit
+header, payload CRC on, preamble 12, sync word 0x12, LDRO on for SF11/12 at
+125 kHz. The PL receiver is built for SF7/BW125 only: CR 4/5..4/8 can be
+measured on it now (coding is decoded on the host); other SF/BW need a
+regenerated correlator per mode (the roadmap at the end).
+
+## Method: noise added in digital, not by attenuation
+
+Attenuators alone cannot reach the interesting SNR range. The lowest Heltec
+output is -9 dBm; through the 30 + 30 dB available the receiver sees about -69
+dBm against a noise floor of about -120 dBm in 125 kHz, i.e. +50 dB SNR, while
+the curves live between -24 and 0 dB. Getting there needs another 50-60 dB and
+a shielded box (at those levels the transmitter couples past the cable).
+
+Instead the **CLG400's own AD9361 transmitter is a calibrated source**:
+
+1. `tools/lora_tx_waveform.py --templates` makes clean packets on the host
+   (the project's modulator and encoder; distinct sequence numbers).
+2. On the board, `board/per/lora_tx_noise` streams template k, a gap, template
+   k+1, ... and adds **independent complex Gaussian noise to every sample**,
+   scaled so that the SNR *in the signal bandwidth BW* is what is asked for
+   (noise density N0 with N0 * BW = 10^(-SNR/10) for unit signal power; white
+   over the 1 MHz sample band). The stream is piped into `iio_writedev`
+   (non-cyclic, so no noise realisation ever repeats).
+3. The signal goes through the attenuators to the receiver under test at a
+   level far above the receiver's own noise, so the SNR is the one set in
+   digital, not the receiver's noise figure.
+4. Every receiver reports every packet. The sequence numbers cycle through the
+   templates; losses are the steps skipped between successive valid packets
+   (`tools/per_measure.py`, `per_from_sequences`). A packet counts only with a
+   valid CRC *and* the right 'ZLP1' header and sequence.
+
+## Wiring
+
+```
+Scheme A -- the PL receiver (same board transmits and receives)
+
+  ZynqSDR CLG400                                           ZynqSDR CLG400
+  ┌──────────┐    ┌────────────┐    ┌──────────────────┐    ┌──────────┐
+  │   TX1 ───┼───►│ 30 dB fixed├───►│ step 0..30 dB    ├───►│ RX1      │
+  │ AD9361   │    └────────────┘    │ (start at 30 dB) │    │ AD9361   │
+  └──────────┘                      └──────────────────┘    └──────────┘
+        lora_tx_noise | iio_writedev          lora_trace_stream (PL trace)
+
+Scheme B -- an SX126x/LR11xx receiver on the same stream
+
+  ZynqSDR TX1 ─► 30 dB fixed ─► step 0..30 dB ─► antenna port of the
+                                                 LilyGO LR1121 / Heltec SX1262
+                                                 (USB serial: *-rx firmware)
+```
+
+The receivers are measured one after the other on the same generated stream
+(the same templates, the same SNR settings); a power splitter would allow
+simultaneous measurement and is not needed for the method.
+
+### Level budget
+
+| Point | Level |
+|---|---|
+| DAC stream RMS | -14 dBFS (signal + noise; clipping counted by `lora_tx_noise`) |
+| AD9361 TX output at 0 dB attenuation | about 0 dBm for that RMS (to be measured) |
+| TX attenuation (`--tx-atten`) | 30 dB to start |
+| cable attenuation | 30 + 30 dB |
+| at the receiver | about -90 dBm total, of which noise dominates at low SNR |
+| receiver's own noise in 125 kHz | about -120 dBm (NF ~ 3-5 dB) |
+
+At SNR = -20 dB (in 125 kHz) with the stream at -90 dBm the injected noise in
+the 125 kHz channel is about -99 dBm, 20 dB above the receiver's own floor: the
+receiver adds 0.04 dB to the set SNR. Keep the injected noise >= 15 dB above the
+floor at every point; the ideal curves then compare directly. For the PL
+receiver the level also has to sit inside the correlator's window (M10: < 5 to
+~5000 LSB at the ADC).
+
+### Calibration checks before a curve
+
+1. **TX off, RX on** (`iio_readdev`): the RX noise floor; confirms nothing leaks
+   into RX when the transmitter is idle.
+2. **Stream at SNR +20 dB**: every receiver must decode 100 %; the PL records
+   are also a regression of the generator against SX126x (a wrong chirp or
+   symbol convention would show as 0 %).
+3. **Stream at a fixed SNR, RX IQ recorded** (`iio_readdev`): the SNR measured
+   from the recording (packet power over noise density in BW) must match the
+   set value within 0.5 dB; this is also where the TX level and the receiver's
+   own noise contribution are measured.
+4. **Clipping**: `lora_tx_noise` reports clipped samples on stderr (kept in the
+   result JSON); must be 0.
+
+## Procedure
+
+```sh
+# build the board programs (Vitis 2021.1 cross-compiler) and the templates
+sh board/per/build.sh
+
+# PL receiver, SF7 CR4/5, 500 packets per point (about 3 minutes per point)
+python tools/per_measure.py --receiver pl --sf 7 --cr 1 \
+    --snr -12 -11 -10 -9.5 -9 -8.5 -8 -7.5 -7 -6 -4 \
+    --packets 500 --tx-atten 30 --out experiments/per/sf7_cr1_pl.json
+
+# LR1121 (COM9) on scheme B, same points
+python tools/per_measure.py --receiver COM9 --sf 7 --cr 1 --snr ... \
+    --packets 500 --tx-atten 30 --out experiments/per/sf7_cr1_lr1121.json
+```
+
+`per_measure.py` uploads the programs and templates, sets the TX LO to 868.1 MHz
+and the attenuation, runs one stream per SNR point, collects the receiver's
+reports and switches the transmitter off (attenuation -89.75 dB, LO powered
+down) at the end, also on error.
+
+Statistics: 500 packets per point resolve PER down to ~1 % (95 % Wilson upper
+bound of 0/500 is 0.76 %); points near PER = 1e-3 need 3000+.
+
+## Ideal curves (computed)
+
+`docs/data/lora_per_ideal.json`, 1000 packets per point, 0.5 dB steps. SNR (dB,
+in BW) at PER = 10 % / 1 %:
+
+| SF | CR 4/5 | CR 4/6 | CR 4/7 | CR 4/8 |
+|---|---|---|---|---|
+| 7 | -8.2 / -7.2 | -8.0 / -7.3 | -9.6 / -8.9 | -9.6 / -8.8 |
+| 8 | -11.0 / -10.1 | -10.9 / -9.5 | -12.3 / -11.7 | -12.3 / -11.0 |
+| 9 | -13.8 / -12.8 | -13.8 / -12.9 | -15.0 / -14.3 | -15.1 / -14.3 |
+| 10 | -16.6 / -15.9 | -16.5 / -15.0 | -17.8 / -17.1 | -17.8 / -17.0 |
+| 11 | -19.4 / -18.5 | -19.3 / -18.5 | -20.5 / -20.0 | -20.6 / -19.9 |
+| 12 | -22.3 / -21.4 | -22.3 / -21.3 | -23.4 / -22.8 | -23.4 / -22.7 |
+
+About 2.8 dB per SF step. CR 4/5 and 4/6 are the same curve (their codes only
+detect an error); 4/7 and 4/8 correct one error per codeword and gain about
+1.4 dB. For reference the SX1262 datasheet quotes demodulator SNR limits of
+-7.5 (SF7) .. -20 dB (SF12); the ideal receiver is expected to be 1-2 dB better.
+
+## State
+
+| Piece | State |
+|---|---|
+| ideal model | done, SF7..12 x CR 4/5..4/8 |
+| generator (`lora_tx_waveform.py`) | done; SNR calibration checked (-0.2 dB at 0 dB set); packets decode |
+| AD9361 TX on the board | device tree fixed: the DDS node (`cf-ad9361-dds-core-lpc@79024000`) had been removed from the card's devicetree.dtb although the DAC core and TX DMA are in the PL; restored from the ADI AD9364 reference (dtb sha256 7404aa91...), RX unchanged (5/5 CRC valid after the change) |
+| `lora_tx_noise` | built; 24 MB of stream in 3.1 s on the Cortex-A9 (real time needs 4 MB/s) |
+| `lora_trace_stream` | built; 10 consecutive over-the-air Heltec packets, all CRC valid, none missed |
+| LR1121 receiver firmware | flashed on COM9; 3/3 Heltec packets received, CRC valid |
+| SX1262 receiver firmware | built; needs a free Heltec |
+| first measured curve | waits for scheme A |
+
+## Limits and caveats
+
+- The AD9361 transmitter's own error (EVM around -35..-40 dB) bounds the
+  highest usable SNR; irrelevant for the curves, which end below +5 dB.
+- The generated packets have no carrier offset and a perfect symbol clock;
+  real transmitters have both. A CFO sweep is a separate axis (the generator
+  can apply one).
+- PER counting needs fewer consecutive losses than templates (64 for SF7/8,
+  fewer for high SF where a template is long); near PER = 1 the count is a
+  lower bound.
+- The PL receiver's timestamps (page 0) are recorded per packet as a by-product,
+  for a later ToA-against-SNR curve.
+
+## Roadmap for other modes in the PL
+
+- BW 250/500 kHz at 1 MS/s: 4 and 2 samples per chip; a smaller correlator.
+- SF8/SF9 at 8 samples per chip: 2048/4096-point FFTs, at the edge of the BRAM
+  (86 of 140 tiles used now).
+- SF10..SF12: need fewer samples per chip (decimation before the correlator).
+Each is a regenerated correlator, its own image and its own curve.

@@ -112,14 +112,30 @@ def main() -> int:
     ap.add_argument("--sf", type=int, default=7)
     ap.add_argument("--bw", type=float, default=125.0, help="kHz: 125, 250, 500 (divides 1 MS/s)")
     ap.add_argument("--cr", type=int, default=1, help="1..4 for 4/5..4/8")
-    ap.add_argument("--snr", type=float, required=True, help="dB in the signal bandwidth")
+    ap.add_argument("--snr", type=float, default=0.0, help="dB in the signal bandwidth")
     ap.add_argument("--packets", type=int, default=100)
     ap.add_argument("--gap", type=float, default=0.25, help="seconds of noise after each packet")
     ap.add_argument("--first-sequence", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--rms-dbfs", type=float, default=-14.0)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--templates", action="store_true",
+                    help="write clean unit-amplitude packets as complex64 for board/per/lora_tx_noise "
+                         "(no gap, no noise; --snr is ignored)")
     args = ap.parse_args()
+
+    if args.templates:
+        waves = [packet_waveform(test_payload(args.first_sequence + k), args.sf, args.bw * 1e3, args.cr)
+                 for k in range(args.packets)]
+        if len({w.size for w in waves}) != 1:
+            raise ValueError("templates differ in length")
+        np.concatenate(waves).astype(np.complex64).tofile(args.out)
+        side = {"sf": args.sf, "bw_khz": args.bw, "cr": args.cr, "packets": args.packets,
+                "samples_per_packet": int(waves[0].size), "first_sequence": args.first_sequence,
+                "format": "complex64, unit amplitude, packets back to back"}
+        args.out.with_suffix(args.out.suffix + ".json").write_text(json.dumps(side, indent=1) + "\n")
+        print(f"{args.out}: {args.packets} templates x {waves[0].size} samples")
+        return 0
 
     x, meta = build(args.sf, args.bw, args.cr, args.snr, args.packets, args.gap,
                     args.first_sequence, args.seed, args.rms_dbfs)

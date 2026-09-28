@@ -1,0 +1,5408 @@
+{
+ "description": "ideal LoRa PER/SER vs SNR in the signal bandwidth (Monte Carlo, perfect timing, no CFO, non-coherent FFT decision, project decoder)",
+ "payload_bytes": 32,
+ "explicit_header": true,
+ "payload_crc": true,
+ "rows": [
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6466551724137931,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5955862068965517,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5322931034482759,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47013793103448276,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4038103448275862,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.331,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.26563793103448274,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.20189655172413792,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.14679310344827587,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.993,
+   "ser": 0.1003103448275862,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.972,
+   "ser": 0.06520689655172414,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.844,
+   "ser": 0.03898275862068965,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.634,
+   "ser": 0.020431034482758622,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.403,
+   "ser": 0.010793103448275863,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.17100000000000004,
+   "ser": 0.003948275862068966,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.06999999999999995,
+   "ser": 0.0015344827586206897,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.020000000000000018,
+   "ser": 0.0004482758620689655,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.006000000000000005,
+   "ser": 0.00013793103448275863,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 3.4482758620689657e-05,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -5.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -5.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -4.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -4.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 1,
+   "snr_db": -3.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 58
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6515147058823529,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5927794117647058,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5299264705882353,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47041176470588236,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.40251470588235294,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3330735294117647,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2661323529411765,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.201,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.14772058823529413,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.994,
+   "ser": 0.09935294117647059,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.966,
+   "ser": 0.06310294117647058,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.858,
+   "ser": 0.03723529411764706,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.6599999999999999,
+   "ser": 0.020558823529411765,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.41100000000000003,
+   "ser": 0.00986764705882353,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.20399999999999996,
+   "ser": 0.004485294117647059,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.09999999999999998,
+   "ser": 0.0017941176470588234,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.026000000000000023,
+   "ser": 0.0004411764705882353,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0030000000000000027,
+   "ser": 0.00014705882352941175,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0050000000000000044,
+   "ser": 7.352941176470588e-05,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -5.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 1.4705882352941177e-05,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -5.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -4.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -4.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 2,
+   "snr_db": -3.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 68
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6511153846153847,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5957051282051282,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5309487179487179,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.46757692307692306,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3997051282051282,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3324102564102564,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2623846153846154,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.997,
+   "ser": 0.20382051282051283,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.961,
+   "ser": 0.1475,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.8029999999999999,
+   "ser": 0.10287179487179487,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.46599999999999997,
+   "ser": 0.06396153846153846,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.21399999999999997,
+   "ser": 0.0381025641025641,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.08099999999999996,
+   "ser": 0.020487179487179485,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.01100000000000001,
+   "ser": 0.009692307692307693,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0050000000000000044,
+   "ser": 0.004397435897435897,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.0015769230769230769,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0004230769230769231,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00020512820512820512,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 2.564102564102564e-05,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -5.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -5.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -4.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -4.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 3,
+   "snr_db": -3.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 78
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6490454545454546,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.595284090909091,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5333636363636364,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47006818181818183,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.40192045454545455,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.33390909090909093,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2650340909090909,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.202625,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.974,
+   "ser": 0.14906818181818182,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.83,
+   "ser": 0.10085227272727272,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.5680000000000001,
+   "ser": 0.06451136363636363,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.22999999999999998,
+   "ser": 0.03651136363636363,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.08699999999999997,
+   "ser": 0.02059090909090909,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.019000000000000017,
+   "ser": 0.010420454545454545,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0050000000000000044,
+   "ser": 0.004227272727272727,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.0015,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0006136363636363636,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0001590909090909091,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 4.545454545454545e-05,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.1363636363636363e-05,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -5.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -5.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -4.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -4.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 7,
+   "cr": 4,
+   "snr_db": -3.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 88
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6698867924528302,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6132830188679246,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5478301886792453,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4765471698113208,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4046037735849057,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.33311320754716983,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2637358490566038,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.19350943396226414,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.998,
+   "ser": 0.13841509433962265,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.985,
+   "ser": 0.08981132075471698,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.911,
+   "ser": 0.05381132075471698,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.733,
+   "ser": 0.030754716981132076,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.478,
+   "ser": 0.015132075471698113,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.242,
+   "ser": 0.0064528301886792455,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.10199999999999998,
+   "ser": 0.0026415094339622643,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.039000000000000035,
+   "ser": 0.0009433962264150943,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.006000000000000005,
+   "ser": 0.000169811320754717,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 1.8867924528301888e-05,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.8867924528301888e-05,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 1,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 53
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.667,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6150322580645161,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5466612903225806,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4755967741935484,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.40633870967741936,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3315,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.26375806451612904,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.19375806451612904,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.13770967741935483,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.99,
+   "ser": 0.08969354838709677,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.913,
+   "ser": 0.05464516129032258,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.769,
+   "ser": 0.030370967741935484,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.529,
+   "ser": 0.015564516129032258,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.263,
+   "ser": 0.006870967741935484,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.11599999999999999,
+   "ser": 0.0026451612903225807,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.038000000000000034,
+   "ser": 0.0009516129032258064,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.01200000000000001,
+   "ser": 0.00024193548387096774,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 3.2258064516129034e-05,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.6129032258064517e-05,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 2,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 62
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6686760563380282,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6074507042253521,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.546,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47616901408450707,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4027042253521127,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.33223943661971833,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2603380281690141,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.987,
+   "ser": 0.1936056338028169,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.917,
+   "ser": 0.1376056338028169,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.685,
+   "ser": 0.08994366197183098,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.395,
+   "ser": 0.05530985915492958,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.15400000000000003,
+   "ser": 0.030704225352112677,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.04700000000000004,
+   "ser": 0.0153943661971831,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0050000000000000044,
+   "ser": 0.006436619718309859,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 0.0027183098591549294,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0010422535211267606,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00022535211267605634,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00011267605633802817,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 3,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 71
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.671,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6109375,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.548325,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4791125,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4081,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.329375,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.258375,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.992,
+   "ser": 0.190625,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.945,
+   "ser": 0.1365875,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.755,
+   "ser": 0.0907,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.41600000000000004,
+   "ser": 0.0554125,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.16600000000000004,
+   "ser": 0.0302875,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.05300000000000005,
+   "ser": 0.0156125,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.014000000000000012,
+   "ser": 0.0071,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00275,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.0010125,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0003,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0001,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.25e-05,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -8.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -7.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -7.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -6.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 8,
+   "cr": 4,
+   "snr_db": -6.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 80
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6799166666666666,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6178333333333333,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5540208333333333,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.48139583333333336,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3995416666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.32214583333333335,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.25052083333333336,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.18164583333333334,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.996,
+   "ser": 0.12195833333333334,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.967,
+   "ser": 0.07779166666666666,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.812,
+   "ser": 0.043625,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.606,
+   "ser": 0.023458333333333335,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.32899999999999996,
+   "ser": 0.0106875,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.15800000000000003,
+   "ser": 0.004395833333333333,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.040000000000000036,
+   "ser": 0.0012291666666666666,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.020000000000000018,
+   "ser": 0.0005833333333333334,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0040000000000000036,
+   "ser": 8.333333333333333e-05,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 1,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6768214285714286,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6179642857142857,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5532142857142858,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4802142857142857,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3974107142857143,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3275,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2465892857142857,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.17608928571428573,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.997,
+   "ser": 0.12201785714285714,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.968,
+   "ser": 0.07721428571428571,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.841,
+   "ser": 0.04525,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.626,
+   "ser": 0.022375,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.345,
+   "ser": 0.010928571428571428,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.16800000000000004,
+   "ser": 0.003982142857142857,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.04800000000000004,
+   "ser": 0.0011607142857142858,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.017000000000000015,
+   "ser": 0.00041071428571428574,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 7.142857142857143e-05,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 1.785714285714286e-05,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 1.785714285714286e-05,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 2,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.680171875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.625375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.548546875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4736875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.397734375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.32284375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.998,
+   "ser": 0.243609375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.98,
+   "ser": 0.1794375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.865,
+   "ser": 0.123765625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.5469999999999999,
+   "ser": 0.07740625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.259,
+   "ser": 0.04509375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.09099999999999997,
+   "ser": 0.023453125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.018000000000000016,
+   "ser": 0.00996875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0040000000000000036,
+   "ser": 0.00409375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.00165625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00046875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.000125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 3.125e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 3,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6804444444444444,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6175972222222222,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5480138888888889,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47768055555555555,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.40226388888888887,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3202083333333333,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.24811111111111112,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.986,
+   "ser": 0.17797222222222223,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.873,
+   "ser": 0.12297222222222222,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.5840000000000001,
+   "ser": 0.07591666666666666,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.281,
+   "ser": 0.044694444444444446,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.08599999999999997,
+   "ser": 0.02327777777777778,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.02100000000000002,
+   "ser": 0.010763888888888889,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0030000000000000027,
+   "ser": 0.004069444444444444,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.0015694444444444445,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0004027777777777778,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 8.333333333333333e-05,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -10.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -10.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -9.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -9.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 9,
+   "cr": 4,
+   "snr_db": -8.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6814883720930233,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6220232558139535,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5446511627906977,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4655348837209302,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3883953488372093,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3017674418604651,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.22709302325581396,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.997,
+   "ser": 0.159,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.979,
+   "ser": 0.10451162790697674,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.865,
+   "ser": 0.05783720930232558,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.6679999999999999,
+   "ser": 0.032046511627906976,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.42400000000000004,
+   "ser": 0.01641860465116279,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.18100000000000005,
+   "ser": 0.006093023255813954,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.08799999999999997,
+   "ser": 0.0027209302325581397,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.02300000000000002,
+   "ser": 0.0005813953488372093,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 2.325581395348837e-05,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 4.651162790697674e-05,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 2.325581395348837e-05,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 1,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.68646,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.62186,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.54732,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47054,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.38568,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.30112,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.22808,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.15884,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.987,
+   "ser": 0.10308,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.928,
+   "ser": 0.06118,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.727,
+   "ser": 0.03358,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.479,
+   "ser": 0.01546,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.23199999999999998,
+   "ser": 0.00688,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.09899999999999998,
+   "ser": 0.00248,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.02400000000000002,
+   "ser": 0.00076,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.010000000000000009,
+   "ser": 0.00022,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 2e-05,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 2e-05,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 2,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6860701754385965,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6197543859649123,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5484736842105263,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47164912280701754,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.38756140350877194,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3035438596491228,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.996,
+   "ser": 0.23015789473684212,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.92,
+   "ser": 0.15652631578947368,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.738,
+   "ser": 0.10207017543859649,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.38,
+   "ser": 0.05977192982456141,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.15300000000000002,
+   "ser": 0.03289473684210526,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.038000000000000034,
+   "ser": 0.01531578947368421,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.006000000000000005,
+   "ser": 0.006614035087719298,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0030000000000000027,
+   "ser": 0.002614035087719298,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0007017543859649122,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 5.2631578947368424e-05,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 3.508771929824561e-05,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 3,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.683625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.620671875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.54675,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.47071875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.38528125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3046875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.2270625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.953,
+   "ser": 0.15840625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.767,
+   "ser": 0.10165625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.41500000000000004,
+   "ser": 0.061375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.16300000000000003,
+   "ser": 0.0333125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.040000000000000036,
+   "ser": 0.01540625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.01100000000000001,
+   "ser": 0.00621875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 0.00225,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.000734375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00015625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.5625e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.5625e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -13.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -12.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -12.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -11.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 10,
+   "cr": 4,
+   "snr_db": -11.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6846041666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6126666666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5358125,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4515,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.36370833333333336,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.2790416666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.19860416666666666,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.992,
+   "ser": 0.13320833333333335,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.963,
+   "ser": 0.08295833333333333,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.85,
+   "ser": 0.04604166666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.5880000000000001,
+   "ser": 0.023395833333333334,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.30900000000000005,
+   "ser": 0.009729166666666667,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.119,
+   "ser": 0.0035625,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.050000000000000044,
+   "ser": 0.0014166666666666668,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.01100000000000001,
+   "ser": 0.0003333333333333333,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0040000000000000036,
+   "ser": 8.333333333333333e-05,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 2.0833333333333333e-05,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 1,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 48
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6835714285714286,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6114821428571429,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5351428571428571,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.45439285714285715,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.36125,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.278125,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.20141071428571428,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.996,
+   "ser": 0.13630357142857144,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.971,
+   "ser": 0.08151785714285714,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.8220000000000001,
+   "ser": 0.04425,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.5840000000000001,
+   "ser": 0.022946428571428572,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.31699999999999995,
+   "ser": 0.009642857142857142,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.14200000000000002,
+   "ser": 0.0037678571428571427,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.04500000000000004,
+   "ser": 0.0011785714285714286,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.010000000000000009,
+   "ser": 0.00023214285714285714,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 3.571428571428572e-05,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.785714285714286e-05,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 2,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 56
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.68196875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.61184375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.537375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.449078125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3624375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.28078125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.988,
+   "ser": 0.198796875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.896,
+   "ser": 0.135375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.593,
+   "ser": 0.083671875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.259,
+   "ser": 0.045328125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.08999999999999997,
+   "ser": 0.023546875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.01200000000000001,
+   "ser": 0.009203125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.003390625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.001203125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.000453125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.000125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 3,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6855277777777777,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6146388888888888,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5363888888888889,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.45180555555555557,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3625138888888889,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.27784722222222225,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.996,
+   "ser": 0.20202777777777778,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.9,
+   "ser": 0.13458333333333333,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.671,
+   "ser": 0.08418055555555555,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.277,
+   "ser": 0.04586111111111111,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.08899999999999997,
+   "ser": 0.02213888888888889,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.014000000000000012,
+   "ser": 0.009652777777777777,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0040000000000000036,
+   "ser": 0.003916666666666666,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0009305555555555556,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00025,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 6.944444444444444e-05,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.388888888888889e-05,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -15.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -15.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -14.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -14.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 11,
+   "cr": 4,
+   "snr_db": -13.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 72
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -28.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6772093023255814,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -27.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5995581395348837,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -27.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5153953488372093,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -26.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4212093023255814,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -26.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3306279069767442,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.24925581395348836,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 0.998,
+   "ser": 0.17462790697674418,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 0.986,
+   "ser": 0.1091860465116279,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 0.898,
+   "ser": 0.061325581395348834,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 0.645,
+   "ser": 0.03058139534883721,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 0.36,
+   "ser": 0.012953488372093024,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.17500000000000004,
+   "ser": 0.005511627906976744,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.05400000000000005,
+   "ser": 0.0019069767441860465,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.014000000000000012,
+   "ser": 0.00041860465116279067,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.0030000000000000027,
+   "ser": 6.976744186046511e-05,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 1,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 43
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -28.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.67422,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -27.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.60122,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -27.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.51534,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -26.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.42708,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -26.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.33246,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.24436,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.16944,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 0.994,
+   "ser": 0.10872,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 0.918,
+   "ser": 0.06298,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 0.714,
+   "ser": 0.03206,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 0.41400000000000003,
+   "ser": 0.01464,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.18600000000000005,
+   "ser": 0.00578,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.050000000000000044,
+   "ser": 0.00156,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.017000000000000015,
+   "ser": 0.00046,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.0030000000000000027,
+   "ser": 8e-05,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 6e-05,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 2,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 50
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -28.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.6712105263157895,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -27.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5978421052631578,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -27.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5171578947368421,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -26.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.4244210526315789,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -26.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.3331578947368421,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 0.994,
+   "ser": 0.24740350877192982,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 0.96,
+   "ser": 0.16989473684210527,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 0.756,
+   "ser": 0.10824561403508771,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 0.399,
+   "ser": 0.06264912280701754,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 0.129,
+   "ser": 0.033035087719298244,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 0.03300000000000003,
+   "ser": 0.013578947368421053,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.0020000000000000018,
+   "ser": 0.005596491228070175,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.0010000000000000009,
+   "ser": 0.0017894736842105263,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0004385964912280702,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00015789473684210527,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 3.508771929824561e-05,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 3,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 57
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -28.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.676546875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -27.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.599828125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -27.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.5201875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -26.5,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.423640625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -26.0,
+   "packets": 1000,
+   "per": 1.0,
+   "ser": 0.335546875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -25.5,
+   "packets": 1000,
+   "per": 0.999,
+   "ser": 0.247484375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -25.0,
+   "packets": 1000,
+   "per": 0.983,
+   "ser": 0.17234375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -24.5,
+   "packets": 1000,
+   "per": 0.7989999999999999,
+   "ser": 0.1074375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -24.0,
+   "packets": 1000,
+   "per": 0.43300000000000005,
+   "ser": 0.06234375,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -23.5,
+   "packets": 1000,
+   "per": 0.14400000000000002,
+   "ser": 0.032390625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -23.0,
+   "packets": 1000,
+   "per": 0.030000000000000027,
+   "ser": 0.014265625,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -22.5,
+   "packets": 1000,
+   "per": 0.006000000000000005,
+   "ser": 0.005578125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -22.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.001703125,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -21.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.00046875,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -21.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 9.375e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -20.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.5625e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -20.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 1.5625e-05,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -19.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -19.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -18.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -18.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -17.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -17.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -16.5,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  },
+  {
+   "sf": 12,
+   "cr": 4,
+   "snr_db": -16.0,
+   "packets": 1000,
+   "per": 0.0,
+   "ser": 0.0,
+   "symbols_per_packet": 64
+  }
+ ]
+}
