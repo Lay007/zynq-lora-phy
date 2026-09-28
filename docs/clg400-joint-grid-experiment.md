@@ -2570,11 +2570,16 @@ from a compiled binary completed normally -- a runner problem, not a design one.
 cycle is needed), profile restored at the new default 37 dB, smoke PASS; drop
 count 1883 after boot, unchanged by the profile restore. Probe at 37 dB: 9/9
 CRC valid. The decisive repeat of the M9 experiment -- 12 blocks of 25
-attempts, 0 dB and 12 dB interleaved -- at 225/224 attempts:
+attempts, 0 dB and 12 dB interleaved, 300 attempts each (runs
+`2026-09-28-clg400-m10-ab-gain0/12`):
 
 | | M9, 0 dB | **M10, 0 dB** | M10, 12 dB |
 |---|---|---|---|
-| packets on air | 295 | 221 | 223 |
+| packets on air | 295 | 295 | 298 |
 | detection misses | 194 (66 %) | **0** | 0 |
-| CRC of captured | 101/101 | 221/221 | 223/223 |
+| CRC of captured | 101/101 | **295/295** | 298/298 |
 | packet peak (median, kept IQ) | 12 LSB | 11 LSB | 40 LSB |
+
+Rescue paths in the M10 experiment: straddle 11 + 12, split 4 + 1, early-sync
+0, all CRC valid; 2 recordings without a packet (send timing) and 5
+transmitter-side failures; no crossing drop. Issue #32 closed.
