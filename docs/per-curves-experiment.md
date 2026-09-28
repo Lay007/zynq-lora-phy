@@ -141,6 +141,24 @@ in BW) at PER = 10 % / 1 %:
 | 11 | -19.4 / -18.5 | -19.3 / -18.5 | -20.5 / -20.0 | -20.6 / -19.9 |
 | 12 | -22.3 / -21.4 | -22.3 / -21.3 | -23.4 / -22.8 | -23.4 / -22.7 |
 
+![Ideal PER vs SNR, SF7..12, one panel per CR](figures/per_ideal.png)
+
+**The model checked against theory.** After dechirping, the 2^SF LoRa symbols
+are orthogonal tones, so with perfect timing the symbol error rate has an
+exact non-coherent M-ary orthogonal form (Rician correct bin, M-1 Rayleigh
+bins, Es/N0 = 2^SF x SNR), evaluated numerically in `tools/lora_per_plots.py`
+(the alternating closed-form sum is unstable at M = 4096). The Monte Carlo
+model's symbol error rate lies on it for every SF; the largest gap where SER >
+2e-3 (enough errors to measure) is 0.62 dB in SER ratio, within the statistics
+of ~58 000 symbols per point. The isolated circles near 2e-5 are single errors.
+So the packet curves stand on a correct symbol layer, and what the PER adds is
+only the packet coding (Gray, interleaving, Hamming, CRC).
+
+![Symbol error rate: theory vs model](figures/ser_model_vs_theory.png)
+
+The small bumps in the PER tails (e.g. SF7 CR 4/6 rising from 3e-3 to 5e-3)
+are counting noise: at 1000 packets a point there has three to five errors.
+
 About 2.8 dB per SF step. CR 4/5 and 4/6 are the same curve (their codes only
 detect an error); 4/7 and 4/8 correct one error per codeword and gain about
 1.4 dB. For reference the SX1262 datasheet quotes demodulator SNR limits of
@@ -150,7 +168,7 @@ detect an error); 4/7 and 4/8 correct one error per codeword and gain about
 
 | Piece | State |
 |---|---|
-| ideal model | done, SF7..12 x CR 4/5..4/8 |
+| ideal model | done, SF7..12 x CR 4/5..4/8; symbol layer matches exact theory (0.62 dB worst, statistics); figures in `docs/figures/` |
 | generator (`lora_tx_waveform.py`) | done; SNR calibration checked (-0.2 dB at 0 dB set); packets decode |
 | AD9361 TX on the board | device tree fixed: the DDS node (`cf-ad9361-dds-core-lpc@79024000`) had been removed from the card's devicetree.dtb although the DAC core and TX DMA are in the PL; restored from the ADI AD9364 reference (dtb sha256 7404aa91...), RX unchanged (5/5 CRC valid after the change) |
 | `lora_tx_noise` | built; 24 MB of stream in 3.1 s on the Cortex-A9 (real time needs 4 MB/s) |
