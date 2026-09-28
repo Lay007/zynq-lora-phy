@@ -42,7 +42,8 @@ PAYLOAD_LENGTH = 32
 def test_payload(sequence: int, length: int = PAYLOAD_LENGTH) -> bytes:
     """The Heltec firmware's counter payload: 'ZLP1', seq, millis, seq + i."""
 
-    head = b"ZLP1" + int(sequence).to_bytes(4, "little") + int(sequence * 97).to_bytes(4, "little")
+    seq = int(sequence) & 0xFFFFFFFF
+    head = b"ZLP1" + seq.to_bytes(4, "little") + ((seq * 97) & 0xFFFFFFFF).to_bytes(4, "little")
     body = bytes((sequence + i) & 0xFF for i in range(length - len(head)))
     return head + body
 
