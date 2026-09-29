@@ -27,7 +27,6 @@ import sys
 import time
 from pathlib import Path
 
-import paramiko
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -40,7 +39,9 @@ PHY = "/sys/bus/iio/devices/iio:device0"
 TEMPLATE_COUNT = {7: 64, 8: 64, 9: 32, 10: 16, 11: 8, 12: 8}
 
 
-def ssh(password: str) -> paramiko.SSHClient:
+def ssh(password: str):
+    import paramiko  # only the bench needs it; keeps the module importable in CI
+
     c = paramiko.SSHClient()
     c.load_host_keys(str(KNOWN_HOSTS))
     c.set_missing_host_key_policy(paramiko.RejectPolicy())
@@ -49,14 +50,14 @@ def ssh(password: str) -> paramiko.SSHClient:
     return c
 
 
-def run(c: paramiko.SSHClient, cmd: str, timeout: float = 120) -> str:
+def run(c, cmd: str, timeout: float = 120) -> str:
     _, o, e = c.exec_command(cmd, timeout=timeout)
     out = o.read().decode()
     o.channel.recv_exit_status()
     return out + e.read().decode()
 
 
-def put(c: paramiko.SSHClient, local: Path, remote: str) -> None:
+def put(c, local: Path, remote: str) -> None:
     i, o, _ = c.exec_command(f"cat > {remote}")
     i.write(local.read_bytes())
     i.channel.shutdown_write()
