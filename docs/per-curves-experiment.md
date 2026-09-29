@@ -1,5 +1,7 @@
 # LoRa packet error rate against SNR: bench experiment
 
+[Русская версия](ru/per-curves-experiment.md)
+
 Status: 2026-09-28. The ideal curves are computed; the bench tools are built and
 tested piecewise (see *State*); the first measured curve waits for the cable
 set-up below.
