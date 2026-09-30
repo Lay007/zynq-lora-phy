@@ -91,6 +91,36 @@ floor at every point; the ideal curves then compare directly. For the PL
 receiver the level also has to sit inside the correlator's window (M10: < 5 to
 ~5000 LSB at the ADC).
 
+**As built and measured on 2026-09-30.** TX1 - step attenuator at 20 dB - fixed
+30 dB - RX1, TX attenuation 10 dB. Noise at the ADC (RMS):
+
+| RX gain | TX off | stream at SNR -7 dB |
+|---|---|---|
+| 37 dB | 0.7 LSB | 5.7 LSB, peak 26 |
+| 47 dB | 1.3 LSB | 17.8 LSB |
+| 57 dB | 2.4 LSB | 57 LSB, peak 277 of 2047 |
+
+**For the PL receiver the absolute level matters, not only the SNR.** The M10
+correlator keeps |X|^2 on 20 bits with an LSB of 2 (`ufix20_E1`); at a few LSB
+of noise weak bins quantize to 0 or 2, ties go to bin 0 and sensitivity is lost
+(#34). PER at SNR -7 dB:
+
+| TX attenuation | RX gain | PER |
+|---|---|---|
+| 0 dB | 37 dB | 0.037 |
+| 4 dB | 37 dB | 0.070 |
+| 8 dB | 37 dB | 1.0 |
+| 12-20 dB | 37 dB | 1.0, nothing detected |
+| 10 dB | 47 dB | 0.023 |
+| 0 dB | 27 dB | 0.93 |
+
+Until M11 (PR #35) the PL curves are taken at 57 dB RX gain
+(`per_measure.py --rx-gain`, the default; the gain goes back to 37 dB after the
+run). A narrow AD9361 RX FIR (`RX_FIR=lora125 restore_rx_profile.sh`) changes
+nothing: the PL correlator is a matched filter over the whole window, so
+out-of-channel noise does not fold into the decision (A/B on 2026-09-30, same
+PER within statistics at -8.5..-7 dB).
+
 ### Calibration checks before a curve
 
 1. **TX off, RX on** (`iio_readdev`): the RX noise floor; confirms nothing leaks
@@ -105,6 +135,19 @@ receiver the level also has to sit inside the correlator's window (M10: < 5 to
 4. **Clipping**: `lora_tx_noise` reports clipped samples on stderr (kept in the
    result JSON); must be 0.
 
+Found during calibration (2026-09-29/30):
+
+- **The DAC mode depends on RX DMA.** While `iio_readdev` runs, the DAC core
+  (set to 2R2T on the 1R1T AD9361) takes the stream at 0.5 MS/s with zero
+  stuffing: a +50 kHz tone comes out at +25 kHz plus an equal image at -475 kHz.
+  Without RX DMA it plays at 1 MS/s. Curves run without RX DMA, so the working
+  templates are 1 MS/s (`--tx-rate`, the default); calibration recordings need
+  0.5 MS/s templates.
+- **The PL receiver is off after a boot** (CONTROL = 0); `per_measure.py`
+  enables it (0x1203, then 0x1201) as `verify_board_b_cold_boot.sh` does.
+- **SNR is checked with a preamble-aided estimate.** Picking the best windows
+  is biased high at low SNR. Set 0 / -6 / -12 dB measured -0.3 / -6.3 / -12.5 dB.
+
 ## Procedure
 
 ```sh
@@ -113,8 +156,11 @@ sh board/per/build.sh
 
 # PL receiver, SF7 CR4/5, 500 packets per point (about 3 minutes per point)
 python tools/per_measure.py --receiver pl --sf 7 --cr 1 \
-    --snr -12 -11 -10 -9.5 -9 -8.5 -8 -7.5 -7 -6 -4 \
-    --packets 500 --tx-atten 30 --out experiments/per/sf7_cr1_pl.json
+    --snr -10 -9.5 -9 -8.5 -8 -7.5 -7 -6.5 -6 -5.5 -5 -4.5 -4 \
+    --packets 500 --tx-atten 10 --rx-gain 57 --out experiments/per/sf7_cr1_pl_g57.json
+
+# recompute PER from the stored traces after a host decoder change
+python tools/per_redecode.py experiments/per/sf7_cr1_pl_g57.json
 
 # LR1121 (COM9) on scheme B, same points
 python tools/per_measure.py --receiver COM9 --sf 7 --cr 1 --snr ... \
@@ -177,7 +223,33 @@ detect an error); 4/7 and 4/8 correct one error per codeword and gain about
 | `lora_trace_stream` | built; 10 consecutive over-the-air Heltec packets, all CRC valid, none missed |
 | LR1121 receiver firmware | flashed on COM9; 3/3 Heltec packets received, CRC valid |
 | SX1262 receiver firmware | built; needs a free Heltec |
-| first measured curve | waits for scheme A |
+| scheme A | built: step 20 dB + fixed 30 dB; calibration passed |
+| PL curves SF7 at 57 dB | CR 4/5..4/8 measured (below) |
+| 3.5 dB loss of the first curve | |X|^2 precision in the correlator (#34); M11 fix in PR #35 |
+| host trace decoder | fixed 2026-09-30: it returned the first CRC-valid hypothesis; on CR 4/6 that made a false ~1 % PER floor |
+
+## Measured curves
+
+SF7, BW 125 kHz, PL receiver, 500 packets per point, TX attenuation 10 dB, RX
+gain 57 dB, PER recomputed with the fixed decoder.
+
+| SNR, dB | -10 | -9.5 | -9 | -8.5 | -8 | -7.5 | -7 | -6.5 | -6 | >= -5.5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CR 4/5 | 0.94 | 0.83 | 0.64 | 0.38 | 0.19 | 0.052 | 0.010 | 0.006 | 0 | 0 |
+| CR 4/6 | 0.96 | 0.88 | 0.61 | 0.32 | 0.15 | 0.056 | 0.016 | 0.006 | 0.004 | 0 |
+| CR 4/7 | 0.74 | 0.50 | 0.24 | 0.11 | 0.038 | 0.014 | 0.004 | 0 | 0 | 0 |
+| CR 4/8 | 0.80 | 0.51 | 0.22 | 0.090 | 0.038 | 0.010 | 0.002 | 0 | 0 | 0 |
+
+CR 4/5 thresholds: PER 10 % at -7.8 dB (ideal -8.2), PER 1 % at -7.0 dB
+(ideal -7.2): the PL receiver is 0.2-0.4 dB from ideal. The first curve
+(2026-09-29, RX gain 37 dB, ~6 LSB of noise at the ADC) was 3.5 dB worse, and
+all of its 1315 symbol errors sat in raw bin 0 (#34).
+
+CR 4/7 and 4/8 are further from ideal: PER 10 % near -8.4..-8.6 dB and 1 %
+near -7.3..-7.4 dB against -9.6 and -8.8..-8.9, i.e. 1.1-1.6 dB. Ideally the
+correcting codes gain ~1.4 dB over 4/5; in the PL they gain ~0.5 dB. Not yet
+explained; the host decoder is the one the ideal model uses, so the first
+check is whether PL symbol errors cluster inside codewords.
 
 ## Limits and caveats
 

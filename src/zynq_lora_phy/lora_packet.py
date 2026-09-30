@@ -558,6 +558,12 @@ def decode_lora_symbol_trace(
     :func:`quarter_symbol_bin_adjustments` hypotheses, then scans the few
     plausible SFD-to-header offsets.  CRC success dominates header-only
     candidates; lower aggregate hard-decision distance breaks ties.
+
+    Every hypothesis is decoded before choosing. Returning the first CRC
+    success let a neighbouring bin adjustment win whenever it happened to
+    pass the 16-bit CRC: on the PER bench (SF7 CR 4/6, 2026-09-30) 55 of
+    5937 packets decoded to a wrong 11- or 53-byte payload although the
+    true packet decoded cleanly two symbols later.
     """
 
     symbol_count = 1 << spreading_factor
@@ -578,11 +584,20 @@ def decode_lora_symbol_trace(
             candidates.append(
                 LoRaTraceDecode(result, offset, adjustment, normalized)
             )
-            if result.success:
-                return candidates[-1]
 
     if not candidates:
         raise ValueError("symbol trace contains no candidate offsets")
+    successes = [item for item in candidates if item.result.success]
+    if successes:
+        return min(
+            successes,
+            key=lambda item: (
+                sum(item.result.header_distances)
+                + sum(item.result.payload_distances),
+                abs(item.bin_adjustment),
+                item.symbol_offset,
+            ),
+        )
     return min(
         candidates,
         key=lambda item: (
