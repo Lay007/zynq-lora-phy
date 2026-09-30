@@ -247,9 +247,22 @@ all of its 1315 symbol errors sat in raw bin 0 (#34).
 
 CR 4/7 and 4/8 are further from ideal: PER 10 % near -8.4..-8.6 dB and 1 %
 near -7.3..-7.4 dB against -9.6 and -8.8..-8.9, i.e. 1.1-1.6 dB. Ideally the
-correcting codes gain ~1.4 dB over 4/5; in the PL they gain ~0.5 dB. Not yet
-explained; the host decoder is the one the ideal model uses, so the first
-check is whether PL symbol errors cluster inside codewords.
+correcting codes gain ~1.4 dB over 4/5; in the PL they gain ~0.5 dB. The
+cause is detection, not decoding. The ideal model assumes known timing;
+the PL first has to find the preamble. Share of packets never detected
+(sequence numbers absent from the records) against PER, CR 4/7:
+
+| SNR, dB | -9.5 | -9 | -8.5 | -8 | -7.5 | -7 |
+|---|---|---|---|---|---|---|
+| missed | 0.37 | 0.21 | 0.105 | 0.036 | 0.014 | 0.004 |
+| PER | 0.50 | 0.24 | 0.113 | 0.038 | 0.014 | 0.004 |
+
+With CR 4/7 and 4/8, PER is almost exactly the missed-detection rate.
+Symbol errors do not cluster (as many interleaver blocks with two or more
+errors as for random placement), and every packet whose errors are
+correctable decodes (101 of 101 at -8 dB). The PL detection threshold is
+about -8.5 dB at 10 % missed, level with the SX1262 datasheet sensitivity
+for SF7 (-7.5 dB). The next gain is in preamble detection (#36).
 
 ## Limits and caveats
 
