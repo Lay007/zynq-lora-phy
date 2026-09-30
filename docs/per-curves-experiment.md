@@ -149,6 +149,37 @@ Found during calibration (2026-09-29/30):
 - **SNR is checked with a preamble-aided estimate.** Picking the best windows
   is biased high at low SNR. Set 0 / -6 / -12 dB measured -0.3 / -6.3 / -12.5 dB.
 
+### AD9361 receiver noise
+
+Measured 2026-09-30 (`tools/ad9361_noise_vs_gain.py`, data in
+`docs/data/ad9361_noise_vs_gain.json`): transmitter off, RX1 terminated by the
+attenuator chain (the thermal noise of a matched load), 1 MS/s, generic FIR,
+`rf_bandwidth` 200 kHz.
+
+| RX gain, dB | 0 | 20 | 30 | 35 | 40 | 45 | 50 | 55 | 60 | 65 | 70 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| noise at the ADC, RMS LSB | 0.54 | 0.78 | 0.97 | 0.62 | 0.79 | 1.12 | 1.69 | 1.98 | 3.29 | 5.03 | 8.16 |
+| in 125 kHz, LSB | 0.19 | 0.31 | 0.41 | 0.23 | 0.32 | 0.49 | 0.78 | 0.91 | 1.56 | 2.37 | 3.88 |
+| input-referred noise vs 70 dB, dB | +43.9 | +28.2 | +20.6 | +10.6 | +8.4 | +7.1 | +6.1 | +2.4 | +2.1 | +0.7 | 0 |
+
+The last row is the in-band density divided by the gain: the sensitivity penalty
+against maximum gain. The gain steps were checked with a tone
+(`tools/ad9361_gain_steps.py`): within +-1.3 dB of the setting over 0..70 dB.
+
+- Below ~40 dB the ADC sees a floor of 0.5-1 LSB (12-bit quantization, ~0.4 LSB
+  per complex sample, plus the digital path); the input's thermal noise is below it.
+- At the standard 37 dB the input-referred noise is 9-10 dB above the 70 dB value:
+  over the air, where only the receiver's own noise is present, sensitivity at
+  37 dB is ~10 dB short of what the front end can do; at 57 dB ~2 dB, at 65 dB 0.7 dB.
+- Between 30 and 35 dB the ADC noise drops while the gain rises: the gain table
+  changes how the gain is split between stages; up to 30 dB the stages in use have
+  a poor noise figure.
+- Over the air the receiver wants ~60-70 dB; a strong nearby signal (the Heltec at
+  1 m clipped at 50 dB) then overloads the ADC, so an AGC or a per-scenario gain
+  is needed.
+- The absolute noise figure needs a dBm-to-LSB calibration with a calibrated
+  generator.
+
 ## Procedure
 
 ```sh

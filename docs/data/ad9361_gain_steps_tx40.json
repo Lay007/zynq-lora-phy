@@ -1,0 +1,79 @@
+{
+ "date": "2026-09-30T14:52",
+ "tx_atten_db": 40.0,
+ "setup": "tone +50 kHz at -14 dBFS through lora_tx_noise (SNR 60 dB), TX1 - step 20 dB - fixed 30 dB - RX1; RX DMA running, so the DAC plays at 0.5 MS/s",
+ "rows": [
+  {
+   "gain_set_db": 30,
+   "tone_lsb2": 0.008824324931243166,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 3.0,
+   "tone_rel_db": -38.98322545223496,
+   "gain_error_db": 1.0167745477650385
+  },
+  {
+   "gain_set_db": 35,
+   "tone_lsb2": 0.019633740142358413,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 2.0,
+   "tone_rel_db": -35.51000997940945,
+   "gain_error_db": -0.5100099794094533
+  },
+  {
+   "gain_set_db": 40,
+   "tone_lsb2": 0.07586008247178723,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 3.0,
+   "tone_rel_db": -29.63990726124344,
+   "gain_error_db": 0.3600927387565598
+  },
+  {
+   "gain_set_db": 45,
+   "tone_lsb2": 0.23757867817351835,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 4.0,
+   "tone_rel_db": -24.681965749373074,
+   "gain_error_db": 0.31803425062692625
+  },
+  {
+   "gain_set_db": 50,
+   "tone_lsb2": 0.7210108741639817,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 6.0,
+   "tone_rel_db": -19.860622219127734,
+   "gain_error_db": 0.13937778087226604
+  },
+  {
+   "gain_set_db": 55,
+   "tone_lsb2": 2.413822272629095,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 9.0,
+   "tone_rel_db": -14.61298746376541,
+   "gain_error_db": 0.38701253623458953
+  },
+  {
+   "gain_set_db": 60,
+   "tone_lsb2": 7.225574917430741,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 16.0,
+   "tone_rel_db": -9.851316283183442,
+   "gain_error_db": 0.14868371681655823
+  },
+  {
+   "gain_set_db": 65,
+   "tone_lsb2": 21.07982879021078,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 26.0,
+   "tone_rel_db": -5.201369574104675,
+   "gain_error_db": -0.2013695741046746
+  },
+  {
+   "gain_set_db": 70,
+   "tone_lsb2": 69.82388939689451,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 47.0,
+   "tone_rel_db": 0.0,
+   "gain_error_db": 0.0
+  }
+ ]
+}
