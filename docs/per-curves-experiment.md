@@ -114,9 +114,10 @@ of noise weak bins quantize to 0 or 2, ties go to bin 0 and sensitivity is lost
 | 10 dB | 47 dB | 0.023 |
 | 0 dB | 27 dB | 0.93 |
 
-Until M11 (PR #35) the PL curves are taken at 57 dB RX gain
-(`per_measure.py --rx-gain`, the default; the gain goes back to 37 dB after the
-run). A narrow AD9361 RX FIR (`RX_FIR=lora125 restore_rx_profile.sh`) changes
+Fixed in M11 (PR #35, deployed 2026-09-30): the peak search sees |X|^2 on 40
+bits, and at 37 dB the curve matches the M10 curve at 57 dB (table below).
+`per_measure.py --rx-gain` defaults to 57 dB, which keeps the ADC noise well
+above quantization; the gain goes back to 37 dB after the run. A narrow AD9361 RX FIR (`RX_FIR=lora125 restore_rx_profile.sh`) changes
 nothing: the PL correlator is a matched filter over the whole window, so
 out-of-channel noise does not fold into the decision (A/B on 2026-09-30, same
 PER within statistics at -8.5..-7 dB).
@@ -225,7 +226,7 @@ detect an error); 4/7 and 4/8 correct one error per codeword and gain about
 | SX1262 receiver firmware | built; needs a free Heltec |
 | scheme A | built: step 20 dB + fixed 30 dB; calibration passed |
 | PL curves SF7 at 57 dB | CR 4/5..4/8 measured (below) |
-| 3.5 dB loss of the first curve | |X|^2 precision in the correlator (#34); M11 fix in PR #35 |
+| 3.5 dB loss of the first curve | |X|^2 precision in the correlator (#34); fixed in M11, deployed and measured |
 | host trace decoder | fixed 2026-09-30: it returned the first CRC-valid hypothesis; on CR 4/6 that made a false ~1 % PER floor |
 
 ## Measured curves
@@ -242,6 +243,16 @@ gain 57 dB, PER recomputed with the fixed decoder.
 
 Figures: `docs/figures/per_sf7_cr{1,2,3,4}_pl_g57_rd.png`; the first,
 low-level curve is `docs/figures/per_sf7_cr1_pl_all.png`.
+
+**M11 at the standard 37 dB** (bitstream 0f6c4167..., 500 packets per point):
+
+| SNR, dB | -10 | -9.5 | -9 | -8.5 | -8 | -7.5 | -7 | -6.5 | -6 | -5.5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| M11, 37 dB | 0.96 | 0.88 | 0.68 | 0.40 | 0.21 | 0.044 | 0.014 | 0.004 | 0.006 | 0 |
+| M10, 57 dB | 0.94 | 0.83 | 0.64 | 0.38 | 0.19 | 0.052 | 0.010 | 0.006 | 0 | 0 |
+| M10, 37 dB | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0.95 | 0.84 |
+
+Figure: `docs/figures/per_sf7_cr1_pl_m11_g37_rd.png`.
 
 CR 4/5 thresholds: PER 10 % at -7.8 dB (ideal -8.2), PER 1 % at -7.0 dB
 (ideal -7.2): the PL receiver is 0.2-0.4 dB from ideal. The first curve

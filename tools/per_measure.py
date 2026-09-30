@@ -191,12 +191,11 @@ def main() -> int:
                          "while iio_readdev records, this board's DAC zero-fills every other 1 MS/s slot "
                          "and takes 0.5 MS/s (see board/per/lora_tx_noise.c)")
     ap.add_argument("--rx-gain", type=float, default=57.0,
-                    help="AD9361 RX gain, dB. The PL correlator keeps its |X|^2 on a 20-bit word "
-                         "scaled for full-scale input, so at low SNR it needs the noise at the ADC well "
-                         "above a few LSB: at SNR -7 dB, TX atten 10 dB, 37 dB gives ~6 LSB rms and "
-                         "PER 1, 47 dB ~18 LSB and PER 0.02, 57 dB ~57 LSB with the peak at 277 of 2047 "
-                         "(bench of 2026-09-30, docs/per-curves-experiment.md). The gain is put back "
-                         "to 37 dB, the over-the-air default, when the run ends.")
+                    help="AD9361 RX gain, dB. Up to M10 the PL correlator lost weak signals at a few "
+                         "LSB of ADC noise (#34: 37 dB gave ~6 LSB rms and PER 1 at SNR -7 dB); M11 "
+                         "fixed that and gives the same curve at 37 and 57 dB. 57 dB keeps the ADC "
+                         "noise (~57 LSB rms, peak 277 of 2047) far above quantization. The gain is "
+                         "put back to 37 dB, the over-the-air default, when the run ends.")
     ap.add_argument("--password", default="analog")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
