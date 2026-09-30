@@ -53,10 +53,10 @@ def chirp(n_chips: int, spc: int, symbol: int = 0, up: bool = True) -> np.ndarra
     return reference_chirp(config, up=False)
 
 
-def packet_waveform(payload: bytes, sf: int, bw_hz: float, cr: int) -> np.ndarray:
-    spc = int(round(SAMPLE_RATE / bw_hz))
-    if spc * bw_hz != SAMPLE_RATE:
-        raise ValueError("BW must divide 1 MS/s")
+def packet_waveform(payload: bytes, sf: int, bw_hz: float, cr: int, fs: float = SAMPLE_RATE) -> np.ndarray:
+    spc = int(round(fs / bw_hz))
+    if spc < 1 or spc * bw_hz != fs:
+        raise ValueError("BW must divide the sample rate")
     n = 1 << sf
     ldro = ldro_required(sf, bw_hz / 1e3)
     symbols = encode_lora_packet(payload, spreading_factor=sf, coding_rate=cr,
@@ -119,19 +119,22 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--rms-dbfs", type=float, default=-14.0)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--fs", type=float, default=SAMPLE_RATE,
+                    help="sample rate of the templates (0.5e6 for this board's DAC path, see "
+                         "board/per/lora_tx_noise.c)")
     ap.add_argument("--templates", action="store_true",
                     help="write clean unit-amplitude packets as complex64 for board/per/lora_tx_noise "
                          "(no gap, no noise; --snr is ignored)")
     args = ap.parse_args()
 
     if args.templates:
-        waves = [packet_waveform(test_payload(args.first_sequence + k), args.sf, args.bw * 1e3, args.cr)
+        waves = [packet_waveform(test_payload(args.first_sequence + k), args.sf, args.bw * 1e3, args.cr, args.fs)
                  for k in range(args.packets)]
         if len({w.size for w in waves}) != 1:
             raise ValueError("templates differ in length")
         np.concatenate(waves).astype(np.complex64).tofile(args.out)
         side = {"sf": args.sf, "bw_khz": args.bw, "cr": args.cr, "packets": args.packets,
-                "samples_per_packet": int(waves[0].size), "first_sequence": args.first_sequence,
+                "samples_per_packet": int(waves[0].size), "first_sequence": args.first_sequence, "sample_rate": args.fs,
                 "format": "complex64, unit amplitude, packets back to back"}
         args.out.with_suffix(args.out.suffix + ".json").write_text(json.dumps(side, indent=1) + "\n")
         print(f"{args.out}: {args.packets} templates x {waves[0].size} samples")

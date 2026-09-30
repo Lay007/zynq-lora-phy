@@ -73,3 +73,4 @@ fpga/generated/**/html/
 fpga/generated/**/_htmllib/
 fpga/generated/**/*.slx
 fpga/generated/**/*.mat
+experiments/per/

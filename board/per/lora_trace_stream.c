@@ -120,6 +120,7 @@ int main(int argc, char **argv) {
     if (stop) break;
     if (!((status & 0x200u) && !(status & 0x100u))) {
       printf("TIMEOUT %" PRIu64 " status=0x%08x\n", now_ms() - t0, status);
+      ++got; /* a timeout is an attempt too, so a dead receiver cannot hang the run */
       continue;
     }
     unsigned captured = status & 0xffu;

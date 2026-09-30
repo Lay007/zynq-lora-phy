@@ -137,6 +137,44 @@ def plot_per(rows, measured, out: Path) -> None:
     plt.close(fig)
 
 
+def plot_measured(rows, m: dict, out: Path) -> None:
+    """One mode: the ideal curve, a measured receiver's PER, and its miss rate."""
+    sf, cr = m["sf"], m["cr"]
+    ideal = sorted((r["snr_db"], r["per"]) for r in rows if r["sf"] == sf and r["cr"] == cr)
+    pts = [p for p in m["points"] if p.get("per") is not None]
+    floor = 5e-4
+    fig, ax = plt.subplots(figsize=(8.2, 5.0), facecolor=SURFACE)
+    style(ax)
+    xs = [s for s, _ in ideal]
+    ax.plot(xs, [max(v, floor) if v > 0 else np.nan for _, v in ideal], color=SERIES[0], lw=2,
+            label=f"ideal receiver (model)")
+    rx = m["receiver"].upper() if m["receiver"].lower() == "pl" else m["receiver"]
+    ax.plot([p["snr_db"] for p in pts], [p["per"] if p["per"] > 0 else np.nan for p in pts], color=SERIES[1], lw=2,
+            marker="s", ms=8, mfc=SURFACE, mec=SERIES[1], mew=2, label=f"{rx}: packet error rate")
+    if all("attempts" in p for p in pts):
+        miss = [(p["snr_db"], p["timeouts"] / p["attempts"]) for p in pts if p["attempts"]]
+        ax.plot([s for s, _ in miss], [max(v, floor) if v > 0 else np.nan for _, v in miss], color=SERIES[2],
+                lw=1.5, ls="--", marker="o", ms=6, mfc=SURFACE, mec=SERIES[2], mew=1.5,
+                label=f"{rx}: packet not detected")
+    ax.set_yscale("log")
+    ax.set_ylim(floor, 1.3)
+    lo = min(min(xs), min(p["snr_db"] for p in pts)) - 0.5
+    hi = max(p["snr_db"] for p in pts) + 1.0
+    ax.set_xlim(lo, hi)
+    ax.set_xlabel("SNR in the signal bandwidth, dB", fontsize=9, color=INK2)
+    ax.set_ylabel("probability", fontsize=9, color=INK2)
+    ax.legend(frameon=False, fontsize=8.5, loc="lower left", labelcolor=INK)
+    ax.set_title(f"SF{sf}, BW {m['bw_khz']:g} kHz, CR 4/{cr + 4}: measured receiver vs ideal",
+                 fontsize=10.5, color=INK, loc="left")
+    n = pts[0]["attempts"] if "attempts" in pts[0] else m.get("packets")
+    fig.text(0.01, 0.01, f"{n} packets per point; AWGN added at the transmitter (CLG400 AD9361), "
+             "SNR set digitally in the signal bandwidth.\nPoints below 5e-4 (no errors) are not drawn.",
+             fontsize=7.5, color=INK2)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.savefig(out, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def plot_ser(rows, out: Path) -> dict:
     g = defaultdict(list)
     for r in rows:
@@ -185,7 +223,9 @@ def main() -> int:
     rows = json.loads(args.ideal.read_text())["rows"]
     measured = [json.loads(p.read_text()) for p in args.measured]
     args.outdir.mkdir(parents=True, exist_ok=True)
-    plot_per(rows, measured, args.outdir / "per_ideal.png")
+    plot_per(rows, [], args.outdir / "per_ideal.png")
+    for path, m in zip(args.measured, measured):
+        plot_measured(rows, m, args.outdir / f"per_{path.stem}.png")
     ser = plot_ser(rows, args.outdir / "ser_model_vs_theory.png")
     (ROOT / "docs/data/lora_ser_theory.json").write_text(json.dumps(ser, indent=1) + "\n")
     print(f"worst model/theory SER ratio: {ser['worst_ser_ratio_db']:.3f} dB")

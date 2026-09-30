@@ -76,9 +76,10 @@ def tx_off(c) -> None:
            f"echo -89.75 > {PHY}/out_voltage0_hardwaregain; echo 1 > {PHY}/out_altvoltage1_TX_LO_powerdown")
 
 
-def tx_start(c, templates: int, spp: int, gap: int, snr: float, bw_hz: float, seed: int) -> None:
+def tx_start(c, templates: int, spp: int, gap: int, snr: float, bw_hz: float, seed: int,
+             fs: float = 1000000.0) -> None:
     run(c, "killall iio_writedev lora_tx_noise 2>/dev/null; sleep 0.3; "
-           f"(/tmp/lora_tx_noise /tmp/tpl.c64 {templates} {spp} {gap} {snr} {bw_hz} -14 {seed} "
+           f"(/tmp/lora_tx_noise /tmp/tpl.c64 {templates} {spp} {gap} {snr} {bw_hz} -14 {seed} {fs} "
            "2>/tmp/tx_noise.err | iio_writedev -b 262144 cf-ad9361-dds-core-lpc "
            ">/tmp/tx_writedev.log 2>&1 &) ; sleep 1")
 
@@ -107,8 +108,11 @@ def per_from_sequences(seqs: list[int], first: int, period: int) -> dict:
             "per": lost / (sent + 1) if order else None}
 
 
-def measure_pl(c, packets: int, first: int, period: int) -> dict:
-    out = run(c, f"/tmp/lora_trace_stream {packets} 4000", timeout=packets * 10 + 60)
+def measure_pl(c, packets: int, first: int, period: int, period_s: float) -> dict:
+    # One attempt = re-arm and wait for the next packet; 1.5 packet periods is
+    # enough, and keeps a point at PER ~ 1 from taking half an hour.
+    timeout_ms = int(1500 * period_s) + 50
+    out = run(c, f"/tmp/lora_trace_stream {packets} {timeout_ms}", timeout=packets * (period_s * 2 + 1) + 60)
     seqs, crc_bad, timeouts, records = [], 0, 0, []
     for line in out.splitlines():
         if line.startswith("TIMEOUT"):
@@ -126,9 +130,17 @@ def measure_pl(c, packets: int, first: int, period: int) -> dict:
         else:
             seqs.append(s)
         records.append({"t_ms": int(line.split()[1]), "crc": bool(r.crc_valid), "seq": s,
-                        "joint": f["joint"], "p0frac": int(f["p0frac"])})
+                        "joint": f["joint"], "p0frac": int(f["p0frac"]), "pbin": int(f["pbin"]),
+                        "realigned": f["realigned"] == "1", "sym": f["sym"][: 2 * int(f["n"])]})
     res = per_from_sequences(seqs, first, period)
-    res.update(crc_fail=crc_bad, timeouts=timeouts, records=records)
+    attempts = len(records) + timeouts
+    if res["per"] is None or res["received_valid"] < 2:
+        # too few valid packets to span sequence gaps: count per attempt
+        res["per"] = 1.0 - res["received_valid"] / attempts if attempts else None
+        res["per_method"] = "per attempt"
+    else:
+        res["per_method"] = "sequence gaps"
+    res.update(crc_fail=crc_bad, timeouts=timeouts, attempts=attempts, records=records)
     return res
 
 
@@ -173,7 +185,18 @@ def main() -> int:
     ap.add_argument("--snr", type=float, nargs="+", required=True)
     ap.add_argument("--packets", type=int, default=500)
     ap.add_argument("--gap", type=float, default=0.3, help="seconds between packets")
-    ap.add_argument("--tx-atten", type=float, default=30.0, help="AD9361 TX attenuation, dB")
+    ap.add_argument("--tx-atten", type=float, default=10.0, help="AD9361 TX attenuation, dB")
+    ap.add_argument("--tx-rate", type=float, default=1000000.0,
+                    help="rate the stream is built at. 1 MS/s while no RX DMA runs (the measuring case); "
+                         "while iio_readdev records, this board's DAC zero-fills every other 1 MS/s slot "
+                         "and takes 0.5 MS/s (see board/per/lora_tx_noise.c)")
+    ap.add_argument("--rx-gain", type=float, default=57.0,
+                    help="AD9361 RX gain, dB. The PL correlator keeps its |X|^2 on a 20-bit word "
+                         "scaled for full-scale input, so at low SNR it needs the noise at the ADC well "
+                         "above a few LSB: at SNR -7 dB, TX atten 10 dB, 37 dB gives ~6 LSB rms and "
+                         "PER 1, 47 dB ~18 LSB and PER 0.02, 57 dB ~57 LSB with the peak at 277 of 2047 "
+                         "(bench of 2026-09-30, docs/per-curves-experiment.md). The gain is put back "
+                         "to 37 dB, the over-the-air default, when the run ends.")
     ap.add_argument("--password", default="analog")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
@@ -185,24 +208,31 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, str(ROOT / "tools/lora_tx_waveform.py"), "--templates",
                     "--sf", str(args.sf), "--bw", str(args.bw), "--cr", str(args.cr),
-                    "--packets", str(templates), "--out", str(tpl)], check=True)
+                    "--packets", str(templates), "--fs", str(args.tx_rate), "--out", str(tpl)], check=True)
     side = json.loads(tpl.with_suffix(".c64.json").read_text())
-    spp, gap = side["samples_per_packet"], int(args.gap * 1e6)
-    period_s = (spp + gap) / 1e6
+    spp, gap = side["samples_per_packet"], int(args.gap * args.tx_rate)
+    period_s = (spp + gap) / args.tx_rate
 
     c = ssh(args.password)
     for local, remote in ((ROOT / "board/per/lora_tx_noise", "/tmp/lora_tx_noise"),
                           (ROOT / "board/per/lora_trace_stream", "/tmp/lora_trace_stream"), (tpl, "/tmp/tpl.c64")):
         put(c, local, remote)
     run(c, "chmod +x /tmp/lora_tx_noise /tmp/lora_trace_stream")
+    # The PL receiver is off after a boot (CONTROL = 0): enable it with sync
+    # word 0x12 and one stream reset, as verify_board_b_cold_boot.sh does.
+    run(c, "c=$(devmem 0x79040404 32); if [ $((c & 1)) -eq 0 ]; then devmem 0x79040404 32 0x1203; "
+           "sleep 0.1; devmem 0x79040404 32 0x1201; fi")
     tx_state = tx_configure(c, args.tx_atten)
+    rx_gain = run(c, f"echo {args.rx_gain:g} > {PHY}/in_voltage0_hardwaregain; "
+                     f"echo {args.rx_gain:g} > {PHY}/in_voltage1_hardwaregain; "
+                     f"cat {PHY}/in_voltage0_hardwaregain").strip()
     points = []
     try:
         for i, snr in enumerate(args.snr):
-            tx_start(c, templates, spp, gap, snr, args.bw * 1e3, 1000 + i)
+            tx_start(c, templates, spp, gap, snr, args.bw * 1e3, 1000 + i, args.tx_rate)
             profile = {"sf": args.sf, "bw_khz": args.bw, "cr": args.cr}
             if args.receiver.lower() == "pl":
-                res = measure_pl(c, args.packets, 0, templates)
+                res = measure_pl(c, args.packets, 0, templates, period_s)
             else:
                 res = measure_serial(args.receiver, args.packets * period_s, 0, templates, profile)
             res["tx_noise"] = run(c, "cat /tmp/tx_noise.err; cat /tmp/tx_writedev.log").strip()[-400:]
@@ -212,11 +242,12 @@ def main() -> int:
                   f"lost {res['lost']}  crc_fail {res['crc_fail']}", flush=True)
     finally:
         tx_off(c)
+        run(c, f"echo 37 > {PHY}/in_voltage0_hardwaregain; echo 37 > {PHY}/in_voltage1_hardwaregain")
         c.close()
     args.out.write_text(json.dumps({
         "receiver": args.receiver, "sf": args.sf, "bw_khz": args.bw, "cr": args.cr,
         "coding_rate": f"4/{args.cr + 4}", "packets": args.packets, "gap_s": args.gap,
-        "tx_atten_db": args.tx_atten, "tx_state": tx_state, "templates": templates,
+        "tx_atten_db": args.tx_atten, "rx_gain_db": args.rx_gain, "rx_gain_state": rx_gain, "tx_rate": args.tx_rate, "tx_state": tx_state, "templates": templates,
         "samples_per_packet": spp, "snr_definition": "in the signal bandwidth, AWGN added digitally at the transmitter",
         "points": points}, indent=1) + "\n", encoding="utf-8")
     return 0

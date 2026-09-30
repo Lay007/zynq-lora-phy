@@ -5,7 +5,7 @@
  * to be piped into iio_writedev (non-cyclic, so every sample is new):
  *
  *   lora_tx_noise templates.iq <packets> <samples_per_packet> <gap_samples>
- *                 <snr_db_in_bw> <bw_hz> <rms_dbfs> [seed]
+ *                 <snr_db_in_bw> <bw_hz> <rms_dbfs> [seed] [sample_rate]
  *     | iio_writedev -b 262144 cf-ad9361-dds-core-lpc
  *
  * templates.iq holds <packets> clean packets back to back, each exactly
@@ -16,8 +16,17 @@
  * is an independent trial even though the templates repeat. The packets carry
  * distinct sequence numbers, so a receiver's misses show as gaps.
  *
- * SNR is defined in the signal bandwidth bw_hz at 1 MS/s: the noise is white
- * over the 1 MHz sample band with density N0 such that N0 * bw = 10^(-SNR/10)
+ * sample_rate (default 1e6) is the rate the templates were made at. On this
+ * board the DAC's rate depends on the RX side: with no RX DMA running it
+ * takes 1 MS/s (the measuring case: the PL receiver and the SX126x/LR11xx
+ * boards need no recording); while iio_readdev records, it takes one of our
+ * samples per two 1 MS/s output slots and zero-fills the other (a +50 kHz tone
+ * left as +25 kHz and an equal image at -475 kHz), so calibration recordings
+ * are made with a 0.5 MS/s stream. SNR in the channel is the same either way:
+ * signal and noise go through the same chain.
+ *
+ * SNR is defined in the signal bandwidth bw_hz: the noise is white over the
+ * sample band with density N0 such that N0 * bw = 10^(-SNR/10)
  * (signal power 1). Output is scaled so that the stream's RMS sits at
  * rms_dbfs of int16 full scale; samples beyond full scale are clipped and
  * counted on stderr.
@@ -29,7 +38,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SAMPLE_RATE 1000000.0
 
 /* xoshiro128+ and a Marsaglia polar Gaussian: fast enough for 2 M normals/s
  * on the Cortex-A9. */
@@ -54,13 +62,14 @@ static inline float gauss(void) {
 
 int main(int argc, char **argv) {
   if (argc < 8) {
-    fprintf(stderr, "usage: %s templates.iq packets samples_per_packet gap_samples snr_db bw_hz rms_dbfs [seed]\n", argv[0]);
+    fprintf(stderr, "usage: %s templates.iq packets samples_per_packet gap_samples snr_db bw_hz rms_dbfs [seed] [sample_rate]\n", argv[0]);
     return 2;
   }
   const char *path = argv[1];
   long packets = atol(argv[2]), spp = atol(argv[3]), gap = atol(argv[4]);
   double snr_db = atof(argv[5]), bw = atof(argv[6]), rms_dbfs = atof(argv[7]);
   uint32_t seed = argc > 8 ? (uint32_t)strtoul(argv[8], NULL, 0) : 1u;
+  double sample_rate = argc > 9 ? atof(argv[9]) : 1e6;
   s[0] = seed ^ 0x9E3779B9u; s[1] = 0x243F6A88u; s[2] = 0xB7E15162u ^ seed; s[3] = 0x7F4A7C15u;
   for (int i = 0; i < 16; ++i) next32();
 
@@ -72,13 +81,13 @@ int main(int argc, char **argv) {
 
   /* Noise per real component: total complex variance N0 * fs. */
   double n0 = pow(10.0, -snr_db / 10.0) / bw;
-  double noise_var = n0 * SAMPLE_RATE;          /* complex, per sample */
+  double noise_var = n0 * sample_rate;          /* complex, per sample */
   float sigma = (float)sqrt(noise_var / 2.0);    /* per component */
   double duty = (double)spp / (double)(spp + gap);
   double total_rms = sqrt(duty * 1.0 + noise_var);
   float scale = (float)(32767.0 * pow(10.0, rms_dbfs / 20.0) / total_rms);
-  fprintf(stderr, "snr_db=%.2f bw=%.0f noise_var=%.4g sigma=%.4g duty=%.3f scale=%.2f\n",
-          snr_db, bw, noise_var, sigma, duty, scale);
+  fprintf(stderr, "snr_db=%.2f bw=%.0f fs=%.0f noise_var=%.4g sigma=%.4g duty=%.3f scale=%.2f\n",
+          snr_db, bw, sample_rate, noise_var, sigma, duty, scale);
 
   enum { CHUNK = 8192 };
   static int16_t out[2 * CHUNK];
