@@ -835,7 +835,7 @@ translate directly into BRAM.
 
 An earlier revision of this section said synthesis was blocked because no
 Vivado was installed and only ISE 14.7 was present. That was wrong: Vivado
-2021.1 is installed at `g:\Xilinx\Vivado\2021.1`, and the search that
+2021.1 is installed at `<VIVADO_INSTALL_ROOT>`, and the search that
 concluded otherwise was mine, not a property of the host. Synthesis results
 are in the next section.
 

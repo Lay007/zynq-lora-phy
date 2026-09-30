@@ -2346,8 +2346,8 @@ boot, before `restore_rx_profile.sh`, was already 1901 (0x76D); it did not move
 through the profile restore or the whole series. The 1906 of the M8 day was the
 same boot-time event; the receive path drops nothing while it runs.
 
-**Series `2026-09-25-clg400-m9-series500`** (17:26-20:35 UTC, archived to
-zynq-sdr-course-artifacts with its manifest):
+**Series `2026-09-25-clg400-m9-series500`** (17:26-20:35 UTC, archived with its manifest in the
+board-evidence archive):
 
 | | M8 series500 (2026-09-24) | M9 series500 |
 |---|---|---|

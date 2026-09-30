@@ -44,7 +44,7 @@ python tools/run_phy_sweep.py `
 python tools/analyze_phy_sweep.py `
   artifacts/phy-sweeps/<основной-прогон> `
   artifacts/phy-sweeps/<repair-прогон> `
-  --matlab "C:\Program Files\MATLAB\R2025a\bin\matlab.exe" `
+  --matlab "matlab" `
   --output artifacts/phy-sweeps/<основной-прогон>/profile-constrained-analysis
 ```
 
@@ -79,7 +79,7 @@ Heltec WiFi LoRa 32 V4 с SX1262 обнаружена как ESP32-S3, MAC
 `10:BD:A3:5A:57:90`. Перед прошивкой сохранён полный образ 16 MiB:
 
 ```text
-G:\Programs\7020\backups\20260802T200300-heltec-wifi-lora32-v4-sx1262\flash-full-16MiB.bin
+<backups>/20260802T200300-heltec-wifi-lora32-v4-sx1262/flash-full-16MiB.bin
 SHA-256 A23B73E914815044601FE549FB8C2BC8DF8A5F9701EF5A194271C83130E3C28E
 ```
 

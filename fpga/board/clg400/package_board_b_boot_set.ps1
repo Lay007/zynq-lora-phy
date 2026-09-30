@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
-    [string]$BaselineDir = 'G:\Programs\zynq-sdr-course-artifacts\boot-sets\board-b-course',
-    [string]$KernelImage = 'G:\Programs\zynq-sdr-course\hardware\7020_ad936x_sdr\boot\sd_image\uImage',
+    # The verified course boot set (from the board-evidence archive); required.
+    [Parameter(Mandatory = $true)][string]$BaselineDir,
+    # Kernel image for the selected board boot set; no sibling layout assumed.
+    [Parameter(Mandatory = $true)][string]$KernelImage,
     [string]$Bitstream = '',
     [string]$Xsa = '',
     [string]$OutputDir = ''
@@ -134,7 +136,7 @@ $manifest = [ordered]@{
         drc_critical_warnings = 0
         warning_boundary = 'Inherited ADI/generated-HDL BRAM asynchronous-control warnings and DSP48 pipeline recommendations remain; hardware qualification is open.'
     }
-    provenance_note = 'The archived board-b-course set omitted uImage. The selected kernel is the byte-identical course sd_image copy and has the same SHA-256 as G:\Programs\7020\course_sd_boardB\uImage.'
+    provenance_note = 'The archived board-b-course set omitted uImage. The selected kernel is the byte-identical course sd_image copy and has the same SHA-256 as the original board image course_sd_boardB/uImage.'
     generated_utc = [DateTime]::UtcNow.ToString('o')
 }
 

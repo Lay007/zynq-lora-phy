@@ -7,11 +7,11 @@ function report = run_hdl_cosimulation(options)
 %
 %   report = run_hdl_cosimulation;
 %   report = run_hdl_cosimulation( ...
-%       VivadoPath="G:/Xilinx/Vivado/2021.1/bin/vivado.bat");
+%       VivadoPath=string(getenv("VIVADO_PATH")));
 
 arguments
     options.VivadoPath (1,1) string = ...
-        "G:/Xilinx/Vivado/2021.1/bin/vivado.bat"
+        string(getenv("VIVADO_PATH"))
     options.WorkDirectory string = string.empty
     options.OutputDirectory string = string.empty
     options.WriteCsv (1,1) logical = true
@@ -38,7 +38,7 @@ if ~license("test", "EDA_Simulator_Link")
     error("lora_sim:NoHdlVerifierLicense", "HDL Verifier is unavailable");
 end
 if ~isfile(options.VivadoPath)
-    error("lora_sim:VivadoNotFound", "Vivado launcher not found: %s", ...
+    error("lora_sim:VivadoNotFound", "Set VIVADO_PATH or pass VivadoPath; launcher not found: %s", ...
         options.VivadoPath);
 end
 

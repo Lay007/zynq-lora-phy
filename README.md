@@ -11,6 +11,11 @@ PHY processing chain, make internal measurements observable, and provide a
 repeatable path from a MATLAB floating-point reference model through Simulink
 and generated Verilog to a ZynqSDR implementation.
 
+The repository is a self-contained baseline for the standard LoRa / LoRa-like
+PHY, SDR acquisition, synchronization, timestamping and positioning; related
+waveform-design research builds on it and is maintained separately (see
+[scope and boundary](docs/public_private_boundary.md)).
+
 For the smaller generic CSS learning path and readable SF7 baseline RTL, see the
 companion [`zynq-sdr-course`](https://github.com/Lay007/zynq-sdr-course). The
 [project-boundary ADR](docs/architecture-decisions/0003-course-project-boundary.md)
@@ -236,6 +241,8 @@ frequency offset, compensates the known offset, and demodulates the symbols.
 ## Architecture and plan
 
 - [System architecture](docs/architecture.md)
+- [Development guide](docs/development.md)
+- [Repository scope and boundary](docs/public_private_boundary.md)
 - [Roadmap and acceptance criteria](docs/roadmap.md)
 - [MATLAB M1 floating-point acceptance](docs/matlab-m1-acceptance.md)
 - [Hardware test bench](docs/test-bench.md)

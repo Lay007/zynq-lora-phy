@@ -16,14 +16,14 @@ course project and its deployed artifacts are read-only inputs.
 Create the project:
 
 ```powershell
-& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\board\clg400\system_project.tcl
 ```
 
 Run the synthesis evidence gate before implementation:
 
 ```powershell
-& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\board\clg400\synth_board.tcl
 ```
 
@@ -36,7 +36,7 @@ contains `0 Errors` and the completion marker exists, generate the same reports
 directly from the checkpoint:
 
 ```powershell
-& G:\\Xilinx\\Vivado\\2021.1\\bin\\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\\board\\clg400\\report_board_checkpoint.tcl
 ```
 
@@ -47,14 +47,14 @@ the checkpoint path above cannot help. Stop the hung `vivado.exe` processes,
 reset the stale run, and run `build_bitstream.tcl` again:
 
 ```powershell
-& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\board\clg400\reset_stale_synth_run.tcl
 ```
 
 Build implementation and bitstream only after project creation succeeds:
 
 ```powershell
-& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\board\clg400\build_bitstream.tcl
 ```
 
@@ -111,7 +111,7 @@ that was already signed off. Export the platform from the completed run instead,
 which re-checks the run status and the timing summary first:
 
 ```powershell
-& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+& $env:VIVADO_PATH -mode batch -nojournal -nolog `
   -source fpga\board\clg400\export_hw_platform.tcl
 ```
 
@@ -280,14 +280,15 @@ After implementation, assemble the six-file SD payload and its manifest:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-  fpga\board\clg400\package_board_b_boot_set.ps1
+  fpga\board\clg400\package_board_b_boot_set.ps1 `
+  -BaselineDir $env:BOARD_BASELINE_DIR -KernelImage $env:BOARD_KERNEL_IMAGE
 ```
 
 The script validates fixed SHA-256 values for the deployed board-B baseline,
 the course kernel, the new bitstream, and the XSA. It refuses to overwrite an
 existing output and creates the ignored directory
 `fpga/build/clg400-board/boot-set-board-b`. The archived board-B artifact set
-omitted `uImage`; the selected sibling-course copy is byte-identical to the
+omitted `uImage`; the explicitly supplied kernel must be byte-identical to the
 original deployed source. `manifest.json` explicitly marks the result
 unqualified and offline-only. The tracked six-row evidence record is
 [`docs/data/rtl-m4-clg400-board-boot-package.csv`](../../../docs/data/rtl-m4-clg400-board-boot-package.csv).

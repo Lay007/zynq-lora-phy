@@ -11,6 +11,11 @@ LoRa-трансиверу. Её задача — сделать наблюдае
 воспроизводимый переход от эталонной MATLAB-модели с плавающей точкой через
 Simulink и автоматически сгенерированный Verilog к аппаратной реализации.
 
+Репозиторий — самодостаточная основа для стандартного LoRa / LoRa-подобного
+PHY, приёма на SDR, синхронизации, меток времени и позиционирования;
+исследования новых форм сигнала опираются на него и ведутся отдельно (см.
+[границу репозитория](docs/ru/public_private_boundary.md)).
+
 Компактный учебный маршрут generic CSS и читаемый SF7 RTL baseline находятся в
 сопутствующем проекте
 [`zynq-sdr-course`](https://github.com/Lay007/zynq-sdr-course). Граница проектов
@@ -183,6 +188,8 @@ hardware/               сведения о платах, тактировани
 
 - [Оглавление](docs/ru/README.md)
 - [Архитектура](docs/ru/architecture.md)
+- [Руководство разработчика](docs/ru/development.md)
+- [Состав и граница репозитория](docs/ru/public_private_boundary.md)
 - [Дорожная карта](docs/ru/roadmap.md)
 - [Приёмка floating-point MATLAB M1](docs/ru/matlab-m1-acceptance.md)
 - [LoRa PHY: whitening, FEC, interleaving и CRC](docs/ru/lora-phy-coding.md)

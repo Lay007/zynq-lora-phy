@@ -5,6 +5,8 @@
 ## Начать отсюда
 
 - [Архитектура системы](architecture.md)
+- [Руководство разработчика](development.md)
+- [Состав и граница репозитория](public_private_boundary.md)
 - [Дорожная карта и критерии готовности](roadmap.md)
 - [Аппаратный timestamping и синхронизация приёмников](hardware-timestamping.md)
 - [Завершённая приёмка floating-point MATLAB M1](matlab-m1-acceptance.md)
