@@ -240,6 +240,9 @@ gain 57 dB, PER recomputed with the fixed decoder.
 | CR 4/7 | 0.74 | 0.50 | 0.24 | 0.11 | 0.038 | 0.014 | 0.004 | 0 | 0 | 0 |
 | CR 4/8 | 0.80 | 0.51 | 0.22 | 0.090 | 0.038 | 0.010 | 0.002 | 0 | 0 | 0 |
 
+Figures: `docs/figures/per_sf7_cr{1,2,3,4}_pl_g57_rd.png`; the first,
+low-level curve is `docs/figures/per_sf7_cr1_pl_all.png`.
+
 CR 4/5 thresholds: PER 10 % at -7.8 dB (ideal -8.2), PER 1 % at -7.0 dB
 (ideal -7.2): the PL receiver is 0.2-0.4 dB from ideal. The first curve
 (2026-09-29, RX gain 37 dB, ~6 LSB of noise at the ADC) was 3.5 dB worse, and
