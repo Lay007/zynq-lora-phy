@@ -43,7 +43,13 @@ def normalize_text(text: str, target: str) -> str:
         rest = re.sub(SEP, "/", m.group("rest"))
         return f"fpga/generated/{target}{rest}"
 
-    return pattern.sub(repl, text)
+    normalized = pattern.sub(repl, text)
+    # Published reports are static summaries, independent of installed scripts.
+    if normalized.lstrip().lower().startswith("<!doctype html>"):
+        normalized = re.sub(r"<script\b[^>]*>.*?</script>", "", normalized,
+                            flags=re.IGNORECASE | re.DOTALL)
+        normalized = re.sub(r"[ \t]+$", "", normalized, flags=re.MULTILINE)
+    return normalized
 
 
 def files() -> list[tuple[Path, str]]:
@@ -56,7 +62,7 @@ def files() -> list[tuple[Path, str]]:
 
 
 def absolute_paths(text: str) -> list[str]:
-    return re.findall(r"(?:[A-Za-z]:(?:\\\\|\\)[^\s\"'<>]+|/(?:home|Users|mnt)/[^\s\"'<>]+)", text)
+    return re.findall(r"(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\s\"'<>]+|/(?:home|Users|mnt|tmp)/[^\s\"'<>]+)", text)
 
 
 def main() -> int:

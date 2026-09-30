@@ -255,7 +255,7 @@ interface, AXI, board clocking, or I/O. A reported dynamic value of 0 W means
 less than the report's 1 mW resolution, not physical zero.
 
 HDL Verifier cosimulation now runs with Vivado XSim from
-`g:\Xilinx\Vivado\2021.1`. The committed M3 evidence covers eight ToA cases and
+`<VIVADO_INSTALL_ROOT>`. The committed M3 evidence covers eight ToA cases and
 matches the MATLAB decision, valid cycle, fractional offset, and peak log
 exactly; both paths report 38 cycles of latency. Run it with
 `model/simulink/run_hdl_cosimulation.m`.

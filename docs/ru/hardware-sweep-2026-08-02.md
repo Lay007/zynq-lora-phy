@@ -44,7 +44,7 @@ python tools/run_phy_sweep.py `
 python tools/analyze_phy_sweep.py `
   artifacts/phy-sweeps/<основной-прогон> `
   artifacts/phy-sweeps/<repair-прогон> `
-  --matlab "C:\Program Files\MATLAB\R2025a\bin\matlab.exe" `
+  --matlab "matlab" `
   --output artifacts/phy-sweeps/<основной-прогон>/profile-constrained-analysis
 ```
 

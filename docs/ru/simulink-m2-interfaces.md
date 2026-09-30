@@ -16,7 +16,7 @@ stage-level golden-векторов. Всё перечисленное — ли�
 |---|---|
 | Хост | Windows 10 Pro 10.0.19045, win64 |
 | MATLAB | R2025a, версия `25.1.0.2943329` |
-| Каталог установки | `C:\Program Files\MATLAB\R2025a` |
+| Каталог установки | `<MATLAB_INSTALL_ROOT>` |
 | Файл лицензии | `licenses/license_WIN-F9DVUKQOSB0_968398_R2025a.lic` |
 
 | Продукт | Версия | Feature лицензии | `license("test")` | `license("checkout")` |

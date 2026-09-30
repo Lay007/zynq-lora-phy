@@ -1,2 +1,2 @@
 Cases,RtlDecisions,FirstLatencyCycles,MaxLatencyCycles,ValidCyclesMatch,OffsetsMatch,LogPeaksMatch,Simulator
-8,8,38,38,1,1,1,G:/Xilinx/Vivado/2021.1/bin/vivado.bat
+8,8,38,38,1,1,1,Vivado 2021.1 (local launcher)

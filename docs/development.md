@@ -58,3 +58,14 @@ It is regenerated, never edited by hand. After regenerating:
 
 What belongs in this repository and what is developed elsewhere is described in
 [repository scope and boundary](public_private_boundary.md).
+
+Tool locations are local configuration: set `VIVADO_PATH` to the Vivado 2021.1
+launcher, or pass `VivadoPath` explicitly to MATLAB build functions. Put MATLAB
+on `PATH`. Keep personal ignore rules in Git local excludes or a global ignore.
+Generated HTML reports are static summaries; workstation-only scripts are removed
+by the normalizer.
+
+Historical board archives are optional evidence, not checkout dependencies.
+The board-B packaging helper requires explicit `BaselineDir` and `KernelImage`
+inputs and checks their published hashes; it cannot reconstruct missing vendor
+boot files. Python, model and RTL regressions use the sources in this repository.

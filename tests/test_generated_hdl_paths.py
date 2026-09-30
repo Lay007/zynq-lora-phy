@@ -28,3 +28,21 @@ def test_normalize_rewrites_windows_and_posix_prefixes() -> None:
     assert normalize_text(esc, "sfd") == '"dir": "fpga/generated/sfd/lora_sfd_gen"'
     posix = "// File Name: /home/builder/gen/sfd/lora_sfd_gen/a.v"
     assert normalize_text(posix, "sfd") == "// File Name: fpga/generated/sfd/lora_sfd_gen/a.v"
+
+
+def test_absolute_path_guard_covers_forward_slashes_and_temporary_roots() -> None:
+    from tools.normalize_generated_hdl import absolute_paths
+
+    for value in ("C:/build/out.v", r"C:\build\out.v", "/tmp/build/out.v",
+                  "/home/builder/out.v", "/Users/builder/out.v"):
+        assert absolute_paths(value) == [value]
+    assert not absolute_paths("fpga/generated/sfd/out.v")
+    assert not absolute_paths("https://example.org http://example.org")
+
+
+def test_reports_are_static_and_keep_engineering_content() -> None:
+    from tools.normalize_generated_hdl import normalize_text
+
+    report = '<!DOCTYPE HTML><script src="file://C:/vendor/a.js"></script>'
+    report += '<script>localUi();</script><p>Latency: 38 cycles</p>'
+    assert normalize_text(report, "sfd") == '<!DOCTYPE HTML><p>Latency: 38 cycles</p>'

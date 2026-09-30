@@ -26,7 +26,7 @@ arguments
     options.Targets (1,:) string = ...
         ["fft-correlator-fixed", "toa-interpolator"]
     options.VivadoPath (1,1) string = ...
-        "g:\Xilinx\Vivado\2021.1\bin\vivado.bat"
+        string(getenv("VIVADO_PATH"))
     options.OutputDirectory string = string.empty
     options.WriteCsv (1,1) logical = true
     options.Verbose (1,1) logical = true
@@ -38,7 +38,7 @@ if isempty(options.OutputDirectory)
     options.OutputDirectory = string(fullfile(repositoryRoot, "docs", "data"));
 end
 if ~isfile(options.VivadoPath)
-    error("lora_sim:NoVivado", "Vivado not found at %s", options.VivadoPath);
+    error("lora_sim:NoVivado", "Set VIVADO_PATH or pass VivadoPath; launcher not found: %s", options.VivadoPath);
 end
 
 definitions = targetDefinitions(repositoryRoot);

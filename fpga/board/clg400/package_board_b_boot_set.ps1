@@ -2,8 +2,8 @@
 param(
     # The verified course boot set (from the board-evidence archive); required.
     [Parameter(Mandatory = $true)][string]$BaselineDir,
-    # Default: the uImage of a zynq-sdr-course checkout next to this repository.
-    [string]$KernelImage = (Join-Path $PSScriptRoot '..\..\..\..\zynq-sdr-course\hardware\7020_ad936x_sdr\boot\sd_image\uImage'),
+    # Kernel image for the selected board boot set; no sibling layout assumed.
+    [Parameter(Mandatory = $true)][string]$KernelImage,
     [string]$Bitstream = '',
     [string]$Xsa = '',
     [string]$OutputDir = ''

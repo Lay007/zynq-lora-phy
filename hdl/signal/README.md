@@ -45,7 +45,7 @@ hdl_sf7_bw125k_fs2000k_chirp-h0-up.pcm
 
 ```matlab
 cd hdl/signal
-open_in_inspector("D:\path\to\hdl_sf7_bw125k_fs2000k_chirp-h0-up.pcm", Language="ru")
+open_in_inspector("captures/hdl_sf7_bw125k_fs2000k_chirp-h0-up.pcm", Language="ru")
 ```
 
 После открытия нажать **«Анализ»**.
@@ -67,7 +67,7 @@ hdl_sf7_bw125k_fs2000k_package.pcm
 Запуск:
 
 ```matlab
-open_in_inspector("D:\path\to\hdl_sf7_bw125k_fs2000k_package.pcm", Language="ru")
+open_in_inspector("captures/hdl_sf7_bw125k_fs2000k_package.pcm", Language="ru")
 ```
 
 Ожидаемый итог:
