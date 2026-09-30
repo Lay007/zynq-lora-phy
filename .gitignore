@@ -64,6 +64,18 @@ desktop.ini
 *.pcm
 .vs/
 
+# Local state of development tools and assistants (sessions, worktrees,
+# per-user settings); never part of the project.
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.codex/
+.kilo/
+.kilocode/
+.cursor/
+.aider*
+.continue/
+
 # Script-generated Simulink models and reports
 model/simulink/generated/
 
