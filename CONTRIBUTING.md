@@ -9,6 +9,11 @@
 5. Compare generated Verilog against versioned MATLAB/Simulink golden vectors.
 6. Update the relevant architecture, experiment, or calibration notes.
 
+The [development guide](docs/development.md) lists the regressions per area
+and the steps after regenerating HDL; the
+[scope and boundary](docs/public_private_boundary.md) document says what
+belongs in this repository and has the pre-publication checklist.
+
 Run the local checks before committing:
 
 ```bash
