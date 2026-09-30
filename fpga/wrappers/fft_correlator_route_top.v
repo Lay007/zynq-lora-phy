@@ -11,6 +11,13 @@
 // weak board packets at its floor (194 of 295 at 0 dB RX gain); with 20 the
 // floor is below 5 LSB and the ceiling unchanged (RTL replay, 2026-09-27).
 //
+// Since #34 the core keeps |X|^2 at 40 bits (ufix40_En19) where it takes the
+// argmax. At 20 bits it was ufix20_E1: at a few LSB of noise every weak bin
+// quantized to 0 or 2, ties went to bin 0, and the PER bench lost ~3.5 dB
+// (PER 1 at ~6 LSB rms). The peak port still reports the old 20-bit value,
+// the top 20 of the 40 bits, so 'peak != 0' keeps meaning exactly what the
+// detector's straddle guard was tuned on; only the argmax gained the bits.
+//
 // The generated DUT is kept untouched. Registering every functional input
 // and output closes its external combinational paths so post-route timing is
 // measured register-to-register. clk_enable is tied high because the
@@ -79,7 +86,8 @@ module fft_correlator_route_top
   wire [31:0] dut_symbolIndex;
   wire dut_symbolValid;
   wire [19:0] dut_confidence;
-  wire [19:0] dut_peakMagnitudeSquared;
+  wire [39:0] dut_peakMagnitudeSquared;
+  wire [19:0] dut_peak_narrow = dut_peakMagnitudeSquared[39:20];
   wire [19:0] dut_spectrumSum;
   wire dut_symbolBoundary;
   wire [63:0] dut_symbolSampleCount;
@@ -138,8 +146,8 @@ module fft_correlator_route_top
       symbolIndex <= dut_symbolIndex;
       symbolValid <= dut_symbolValid;
       confidence <= dut_confidence[19:4];
-      peakMagnitudeSquared <= (dut_peakMagnitudeSquared[19:4] != 16'd0) ? dut_peakMagnitudeSquared[19:4] :
-                              ((dut_peakMagnitudeSquared != 20'd0) ? 16'd1 : 16'd0);
+      peakMagnitudeSquared <= (dut_peak_narrow[19:4] != 16'd0) ? dut_peak_narrow[19:4] :
+                              ((dut_peak_narrow != 20'd0) ? 16'd1 : 16'd0);
       spectrumSum <= dut_spectrumSum[19:4];
       symbolBoundary <= dut_symbolBoundary;
       symbolSampleCount <= dut_symbolSampleCount;
