@@ -64,6 +64,19 @@ def put(c, local: Path, remote: str) -> None:
     o.channel.recv_exit_status()
 
 
+def board_temps(c) -> dict:
+    """AD9361 and Zynq (XADC) die temperatures in degrees C. The AD9361 sensor is uncalibrated
+    (a few degrees of offset), so use it for drift within a run, not as an absolute value."""
+    out = run(c, f"cat {PHY}/in_temp0_input; x=/sys/bus/iio/devices/iio:device1; "
+                 "cat $x/in_temp0_raw $x/in_temp0_offset $x/in_temp0_scale").split()
+    try:
+        ad = float(out[0]) / 1000.0
+        raw, off, scale = (float(v) for v in out[1:4])
+        return {"ad9361_c": round(ad, 2), "zynq_c": round((raw + off) * scale / 1000.0, 2)}
+    except (IndexError, ValueError):
+        return {"raw": out}
+
+
 def tx_configure(c, tx_atten_db: float) -> str:
     return run(c, f"echo 868100000 > {PHY}/out_altvoltage1_TX_LO_frequency; "
                   f"echo 0 > {PHY}/out_altvoltage1_TX_LO_powerdown; "
@@ -221,6 +234,7 @@ def main() -> int:
     # word 0x12 and one stream reset, as verify_board_b_cold_boot.sh does.
     run(c, "c=$(devmem 0x79040404 32); if [ $((c & 1)) -eq 0 ]; then devmem 0x79040404 32 0x1203; "
            "sleep 0.1; devmem 0x79040404 32 0x1201; fi")
+    temps_start = board_temps(c)
     tx_state = tx_configure(c, args.tx_atten)
     rx_gain = run(c, f"echo {args.rx_gain:g} > {PHY}/in_voltage0_hardwaregain; "
                      f"echo {args.rx_gain:g} > {PHY}/in_voltage1_hardwaregain; "
@@ -241,12 +255,13 @@ def main() -> int:
                   f"lost {res['lost']}  crc_fail {res['crc_fail']}", flush=True)
     finally:
         tx_off(c)
+        temps_end = board_temps(c)
         run(c, f"echo 37 > {PHY}/in_voltage0_hardwaregain; echo 37 > {PHY}/in_voltage1_hardwaregain")
         c.close()
     args.out.write_text(json.dumps({
         "receiver": args.receiver, "sf": args.sf, "bw_khz": args.bw, "cr": args.cr,
         "coding_rate": f"4/{args.cr + 4}", "packets": args.packets, "gap_s": args.gap,
-        "tx_atten_db": args.tx_atten, "rx_gain_db": args.rx_gain, "rx_gain_state": rx_gain, "tx_rate": args.tx_rate, "tx_state": tx_state, "templates": templates,
+        "tx_atten_db": args.tx_atten, "rx_gain_db": args.rx_gain, "rx_gain_state": rx_gain, "temps_start": temps_start, "temps_end": temps_end, "tx_rate": args.tx_rate, "tx_state": tx_state, "templates": templates,
         "samples_per_packet": spp, "snr_definition": "in the signal bandwidth, AWGN added digitally at the transmitter",
         "points": points}, indent=1) + "\n", encoding="utf-8")
     return 0

@@ -47,7 +47,8 @@ try:
         p_tone = float(spec[max(0, k - 2):k + 3].sum())  # LSB^2 (mean square of the tone)
         f_tone = float(np.fft.fftfreq(N, 1e-6)[k])
         peak = float(np.max(np.abs(np.concatenate([x.real, x.imag]))))
-        rows.append({"gain_set_db": g, "tone_lsb2": p_tone, "tone_hz": f_tone, "peak_abs": peak})
+        rows.append({"gain_set_db": g, "tone_lsb2": p_tone, "tone_hz": f_tone, "peak_abs": peak,
+                     "temps": pm.board_temps(c)})
         print(f"gain {g:2d}: tone {10 * np.log10(p_tone):+7.2f} dB LSB^2 at {f_tone / 1e3:+.1f} kHz  peak {peak:.0f}", flush=True)
 finally:
     pm.tx_off(c)

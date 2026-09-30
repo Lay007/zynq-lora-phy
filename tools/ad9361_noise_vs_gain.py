@@ -56,6 +56,7 @@ for g in range(0, 75, 5):
         "density_band_lsb2_per_hz": float(np.mean(psd[band]) / 1e6),
         "density_edge_lsb2_per_hz": float(np.mean(psd[edge]) / 1e6),
         "peak_abs": float(np.max(np.abs(np.concatenate([x.real, x.imag])))),
+        "temps": pm.board_temps(c),
     }
     row["noise_in_125k_lsb_rms"] = float(np.sqrt(row["density_band_lsb2_per_hz"] * 125e3))
     rows.append(row)
