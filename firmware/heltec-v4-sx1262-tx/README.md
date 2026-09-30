@@ -32,7 +32,7 @@ BUSY is 13, and the TCXO setting is 1.8 V.
 The connected test board was backed up before flashing:
 
 ```text
-G:\Programs\7020\backups\20260802T200300-heltec-wifi-lora32-v4-sx1262\flash-full-16MiB.bin
+<backups>/20260802T200300-heltec-wifi-lora32-v4-sx1262/flash-full-16MiB.bin
 SHA-256 A23B73E914815044601FE549FB8C2BC8DF8A5F9701EF5A194271C83130E3C28E
 ```
 

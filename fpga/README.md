@@ -13,7 +13,8 @@
 The first hardware target is fixed by
 [`ADR 0004`](../docs/architecture-decisions/0004-first-hardware-target.md).
 The CLG400 part is confirmed by the deployed bitstream headers and routed
-reports in `zynq-sdr-course-artifacts`. Package-specific bitstreams and
+reports kept in the separately maintained board-evidence archive.
+Package-specific bitstreams and
 constraints must never be exchanged between CLG400 and CLG484.
 
 The CLG400 boards run **Pluto firmware**, which is why the capture documentation
@@ -28,8 +29,8 @@ synthesized for the real CLG400 part; neither result is a substitute for
 board-level implementation and measurement.
 
 Board bring-up material — boot sets, SD images, QSPI backups, and a working
-FMCOMMS2 reference design — lives outside this repository in
-`zynq-sdr-course` and `zynq-sdr-course-artifacts`.
+FMCOMMS2 reference design — lives outside this repository: in
+`zynq-sdr-course` and in the separately maintained board-evidence archive.
 
 The conducted first-board procedure and safety gates are in
 [`docs/clg400-hardware-bring-up.md`](../docs/clg400-hardware-bring-up.md).
