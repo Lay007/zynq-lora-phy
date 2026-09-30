@@ -81,6 +81,12 @@ module lora_packet_toa_receiver_top #(
     // High in the same cycle as `detected` when the sync word was accepted
     // only by the detector's straddle-tolerant path (M7).
     output wire               packet_straddle_detected,
+    // The detector accepted the packet only through its split-tolerant path
+    // (M9), in the same cycle as `detected`.
+    output wire               packet_split_detected,
+    // ... or only through its early-sync path (the tie window at half a
+    // symbol read as the first sync symbol).
+    output wire               packet_early_sync_detected,
     output wire               preamble_detected,
     output wire               sync_valid,
     output wire [15:0]        preamble_bin,
@@ -165,6 +171,11 @@ module lora_packet_toa_receiver_top #(
     // A caller-supplied request wins, so an integration that owns its own
     // timing policy keeps the port it always had. With nothing driving it the
     // receiver aligns its own grid to the packet it just acquired.
+    // Declared here because the correlator path below uses them before the
+    // joint controller that drives them is instantiated.
+    wire joint_grid_precise_correction_applied;
+    wire signed [31:0] joint_cfo_q12;
+
     wire auto_resync_valid;
     wire [31:0] auto_resync_skip;
     wire fine_resync_valid;
@@ -214,6 +225,14 @@ module lora_packet_toa_receiver_top #(
         .resync_valid(effective_resync_valid),
         .resync_skip(effective_resync_skip),
         .sync_word(sync_word),
+        // Remove the packet's carrier offset from every decision after the
+        // joint estimate (see lora_cfo_derotator): start on the precise
+        // correction, stop at the next detection, re-arm or reset, so the
+        // preamble of the next packet is searched on the raw stream as
+        // before. The IQ history the joint search reads stays raw.
+        .cfo_load(joint_grid_precise_correction_applied),
+        .cfo_q12(joint_cfo_q12),
+        .cfo_clear(detected || reset_in || trace_rearm_in),
         .symbol_index(symbol_index),
         .symbol_valid(symbol_valid),
         .confidence(symbol_confidence),
@@ -221,6 +240,8 @@ module lora_packet_toa_receiver_top #(
         .timestamp_valid(symbol_timestamp_valid),
         .detected(detected),
         .straddle_detected(detector_straddle),
+        .split_detected(packet_split_detected),
+        .early_sync_detected(packet_early_sync_detected),
         .preamble_detected(preamble_detected),
         .sync_valid(sync_valid),
         .preamble_bin(preamble_bin),
@@ -291,11 +312,17 @@ module lora_packet_toa_receiver_top #(
     wire joint_grid_timing_range_error;
     wire joint_grid_up_search_abort_error;
     wire joint_grid_down_search_abort_error;
-    wire joint_grid_precise_correction_applied;
     wire joint_search_start;
     wire [63:0] joint_search_coarse_start;
     wire signed [31:0] joint_timing_correction_unused;
     wire joint_timing_valid_unused;
+    // CFO-free packet time of arrival from the joint up/down pair; see
+    // lora_joint_chirp_grid_controller's toa_coarse.
+    wire [63:0] joint_toa_coarse;
+    wire signed [31:0] joint_toa_fraction_q12;
+    // The interpolator's own logPeak (up and down legs alike); the port
+    // toa_log_peak_q12 carries the up leg's, see below.
+    wire signed [31:0] raw_toa_log_peak_q12;
 
     // The detector presents chips_to_boundary on `detected`. The joint
     // controller starts on `packet_start_valid`, a later pulse, by which
@@ -364,7 +391,10 @@ module lora_packet_toa_receiver_top #(
                 .timing_range_error(joint_grid_timing_range_error),
                 .up_search_abort_error(joint_grid_up_search_abort_error),
                 .down_search_abort_error(joint_grid_down_search_abort_error),
-                .precise_correction_applied(joint_grid_precise_correction_applied)
+                .precise_correction_applied(joint_grid_precise_correction_applied),
+                .toa_coarse(joint_toa_coarse),
+                .toa_fraction_q12(joint_toa_fraction_q12),
+                .cfo_q12(joint_cfo_q12)
             );
         end else begin : g_legacy_toa_search
             assign joint_search_start = packet_start_valid && receiver_enable;
@@ -376,6 +406,9 @@ module lora_packet_toa_receiver_top #(
             assign fine_resync_skip = 32'd0;
             assign fine_resync_valid = 1'b0;
             assign joint_timing_correction_unused = 32'sd0;
+            assign joint_toa_coarse = 64'd0;
+            assign joint_toa_fraction_q12 = 32'sd0;
+            assign joint_cfo_q12 = 32'sd0;
             assign joint_timing_valid_unused = 1'b0;
             assign joint_grid_restart_error = 1'b0;
             assign joint_grid_timing_range_error = 1'b0;
@@ -465,7 +498,7 @@ module lora_packet_toa_receiver_top #(
         .tripletValid(raw_peak_triplet_valid),
         .offsetSamples(toa_offset_q12),
         .offsetValid(toa_offset_valid),
-        .logPeak(toa_log_peak_q12)
+        .logPeak(raw_toa_log_peak_q12)
     );
 
     // The interpolator above now runs for both joint-grid legs (up and down),
@@ -481,13 +514,51 @@ module lora_packet_toa_receiver_top #(
     // sampling it here reliably attributes each pulse to its leg.
     wire toa_offset_valid_up = toa_offset_valid && !reference_down;
 
+    // Which fragments make the packet's timestamp.
+    //
+    // With the joint grid it is the controller's toa_coarse/toa_fraction_q12:
+    // the up leg's coarse start plus (up + down) / 2, which cancels the
+    // carrier offset. It used to be the up leg's peak alone, and an upchirp's
+    // matched-filter peak moves by the CFO displacement: measured on 923
+    // board captures, the up peak sat -3.15 samples (mean) from the joint
+    // timing, equal to the reference model's CFO displacement on the same
+    // packets, and on synthetic packets through this RTL the old metadata
+    // was off by exactly that displacement. Both fragments now arrive on the
+    // precise_correction_applied pulse, after the down leg. A packet whose
+    // joint estimate aborts or is rejected gets no timestamp: an up-leg-only
+    // value would carry the CFO error, and the joint page's sticky bits say
+    // what happened.
+    //
+    // Without the joint grid (legacy build) nothing changes.
+    wire [63:0] metadata_coarse_in = (AUTO_GRID_RESYNC != 0)
+        ? joint_toa_coarse : peak_sample_count;
+    wire metadata_coarse_valid_in = (AUTO_GRID_RESYNC != 0)
+        ? joint_grid_precise_correction_applied : peak_triplet_valid;
+    wire signed [31:0] metadata_fraction_in = (AUTO_GRID_RESYNC != 0)
+        ? joint_toa_fraction_q12 : toa_offset_q12;
+    wire metadata_fraction_valid_in = (AUTO_GRID_RESYNC != 0)
+        ? joint_grid_precise_correction_applied : toa_offset_valid_up;
+
+    // The log-peak reported with the timestamp stays the up leg's. The
+    // timestamp now completes after the down leg, whose interpolation
+    // overwrites the interpolator's logPeak, so hold the up leg's value.
+    reg  signed [31:0] held_up_log_peak_q12;
+    always @(posedge clk) begin
+        if (!resetn)
+            held_up_log_peak_q12 <= 32'sd0;
+        else if (toa_offset_valid_up)
+            held_up_log_peak_q12 <= raw_toa_log_peak_q12;
+    end
+    assign toa_log_peak_q12 = (AUTO_GRID_RESYNC != 0)
+        ? held_up_log_peak_q12 : raw_toa_log_peak_q12;
+
     lora_timestamp_metadata_join u_metadata_join (
         .clk(clk),
         .resetn(datapath_resetn),
-        .coarse_sample_count(peak_sample_count),
-        .coarse_valid(peak_triplet_valid),
-        .fractional_toa_q12(toa_offset_q12),
-        .fractional_valid(toa_offset_valid_up),
+        .coarse_sample_count(metadata_coarse_in),
+        .coarse_valid(metadata_coarse_valid_in),
+        .fractional_toa_q12(metadata_fraction_in),
+        .fractional_valid(metadata_fraction_valid_in),
         .timestamp_coarse(metadata_coarse),
         .timestamp_fractional_q12(metadata_fractional_q12),
         .timestamp_valid(metadata_valid),

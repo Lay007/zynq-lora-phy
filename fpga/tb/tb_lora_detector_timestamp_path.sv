@@ -15,6 +15,8 @@ module tb_lora_detector_timestamp_path;
 
     wire        detected;
     wire        straddle_detected;
+    wire        split_detected;
+    wire        early_sync_detected;
     wire        preamble_detected;
     wire        sync_valid;
     wire [15:0] preamble_bin;
@@ -32,6 +34,10 @@ module tb_lora_detector_timestamp_path;
     reg edge_preamble;
     reg edge_detected;
     reg edge_straddle;
+    reg edge_split;
+    reg edge_early;
+    reg [15:0] edge_bin;
+    reg [15:0] edge_chips;
     reg edge_sync_valid;
 
     always #5 clk = ~clk;
@@ -49,6 +55,8 @@ module tb_lora_detector_timestamp_path;
         .symbol_peak(symbol_peak),
         .detected(detected),
         .straddle_detected(straddle_detected),
+        .split_detected(split_detected),
+        .early_sync_detected(early_sync_detected),
         .preamble_detected(preamble_detected),
         .sync_valid(sync_valid),
         .preamble_bin(preamble_bin),
@@ -123,6 +131,10 @@ module tb_lora_detector_timestamp_path;
             edge_preamble = preamble_detected;
             edge_detected = detected;
             edge_straddle = straddle_detected;
+            edge_split = split_detected;
+            edge_early = early_sync_detected;
+            edge_bin = preamble_bin;
+            edge_chips = chips_to_boundary;
             edge_sync_valid = sync_valid;
             #1;
             symbol_valid = 1'b0;
@@ -343,6 +355,139 @@ module tb_lora_detector_timestamp_path;
         send_symbol(32'd97, 64'd1300, 1'b1);
         send_symbol(32'd113, 64'd1400, 1'b1);
         expect_bit("straddle at reference bin 97 is above the band", edge_detected, 1'b0);
+
+        // M9: the split preamble. The decisions below are the board's own,
+        // read from the decision-history ring over three of the seven misses
+        // of 2026-09-24 (the RTL replayed at the board's phase gives the same
+        // sixteen). The preamble peak split into lobes one bin either side of
+        // the truth, so decisions jump by 2 and the +/-1 rules never fire.
+        // 163349Z: [52, 51 x8, 53, 53, 53, 52, 60, 69] -- the ordinary form.
+        pulse_stream_reset();
+        send_symbol(32'd52, 64'd100, 1'b1);
+        send_run(32'd51, 8, 64'd200);
+        send_symbol(32'd53, 64'd1000, 1'b1);
+        send_symbol(32'd53, 64'd1100, 1'b1);
+        send_symbol(32'd53, 64'd1200, 1'b1);
+        send_symbol(32'd52, 64'd1300, 1'b1);
+        send_symbol(32'd60, 64'd1400, 1'b1);
+        expect_bit("split miss 163349Z: no detection yet at sync1", edge_detected, 1'b0);
+        send_symbol(32'd69, 64'd1500, 1'b1);
+        expect_bit("split miss 163349Z is detected", edge_detected, 1'b1);
+        expect_bit("split miss 163349Z: split path", edge_split, 1'b1);
+        expect_bit("split miss 163349Z: not the straddle form", edge_straddle, 1'b0);
+        expect_u16("split miss 163349Z: preamble bin is the lobe centre", edge_bin, 16'd52);
+        expect_u16("split miss 163349Z: chips_to_boundary = N - bin", edge_chips, 16'd76);
+        // 180856Z: [56, 55 x8, 57, 57, 55, 56, 72, 73] -- split AND the first
+        // sync symbol read as one more preamble bin (straddle form).
+        pulse_stream_reset();
+        send_symbol(32'd56, 64'd100, 1'b1);
+        send_run(32'd55, 8, 64'd200);
+        send_symbol(32'd57, 64'd1000, 1'b1);
+        send_symbol(32'd57, 64'd1100, 1'b1);
+        send_symbol(32'd55, 64'd1200, 1'b1);
+        send_symbol(32'd56, 64'd1300, 1'b1);
+        send_symbol(32'd72, 64'd1400, 1'b1);
+        expect_bit("split miss 180856Z (straddle form) is detected", edge_detected, 1'b1);
+        expect_bit("split miss 180856Z: split path", edge_split, 1'b1);
+        expect_bit("split miss 180856Z: raises the straddle flag", edge_straddle, 1'b1);
+        expect_u16("split miss 180856Z: preamble bin is the lobe centre", edge_bin, 16'd56);
+        send_symbol(32'd73, 64'd1500, 1'b1);
+        expect_bit("split miss 180856Z: fires once, not again next symbol", edge_detected, 1'b0);
+        // 164405Z: [62, 61 x4, 63 x7, 62, 78, 79] -- straddle form again.
+        pulse_stream_reset();
+        send_symbol(32'd62, 64'd100, 1'b1);
+        send_run(32'd61, 4, 64'd200);
+        send_run(32'd63, 7, 64'd600);
+        send_symbol(32'd62, 64'd1300, 1'b1);
+        send_symbol(32'd78, 64'd1400, 1'b1);
+        expect_bit("split miss 164405Z (straddle form) is detected", edge_detected, 1'b1);
+        expect_bit("split miss 164405Z: split path", edge_split, 1'b1);
+        // A deviation of 3 is not a split: rejected.
+        pulse_stream_reset();
+        send_run(32'd51, 5, 64'd100);
+        send_run(32'd54, 3, 64'd600);
+        send_symbol(32'd51, 64'd900, 1'b1);
+        send_symbol(32'd59, 64'd1000, 1'b1);
+        send_symbol(32'd67, 64'd1100, 1'b1);
+        expect_bit("a preamble spread of 3 bins is not accepted", edge_detected, 1'b0);
+        // Silence gives the split path nothing: zeros, then an onset at 8
+        // and 16. (That exact pair is the generated rule's own pattern with
+        // reference 0, and the generated rule does fire on it -- two
+        // coincidences after silence, its long-known weakness; only the split
+        // path's refusal is asserted here.)
+        pulse_stream_reset();
+        symbol_peak = 16'd0;
+        send_run(32'd0, 8, 64'd100);
+        symbol_peak = 16'd1;
+        send_symbol(32'd8, 64'd900, 1'b1);
+        send_symbol(32'd16, 64'd1000, 1'b1);
+        expect_bit("silence then 8, 16 is not a split detection", edge_split, 1'b0);
+        // Nor zeros then a split-looking run inside the band: the silent
+        // decisions in the window refuse it.
+        pulse_stream_reset();
+        symbol_peak = 16'd0;
+        send_run(32'd0, 4, 64'd100);
+        symbol_peak = 16'd100;
+        send_run(32'd51, 4, 64'd500);
+        send_symbol(32'd51, 64'd900, 1'b1);
+        send_symbol(32'd59, 64'd1000, 1'b1);
+        send_symbol(32'd67, 64'd1100, 1'b1);
+        expect_bit("silent decisions in the window refuse the split path", edge_split, 1'b0);
+        symbol_peak = 16'd100;
+        // Outside the reference band (N/4..3N/4) the split path stays shut.
+        pulse_stream_reset();
+        send_run(32'd30, 4, 64'd100);
+        send_run(32'd28, 4, 64'd500);
+        send_symbol(32'd38, 64'd900, 1'b1);
+        send_symbol(32'd46, 64'd1000, 1'b1);
+        expect_bit("a split pattern at reference bin 30 is below the band", edge_detected, 1'b0);
+        // An ordinary packet is still for the generated rule, not this path.
+        pulse_stream_reset();
+        send_run(32'd64, 12, 64'd100);
+        send_symbol(32'd72, 64'd1300, 1'b1);
+        send_symbol(32'd80, 64'd1400, 1'b1);
+        expect_bit("an ordinary packet is detected", edge_detected, 1'b1);
+        expect_bit("an ordinary packet does not use the split path", edge_split, 1'b0);
+        expect_bit("an ordinary packet does not use the early-sync path", edge_early, 1'b0);
+
+        // Early sync: the packet half a symbol from the window, the tie
+        // window (last preamble chirp + first sync chirp) read as sync. These
+        // are the decisions of tb_lora_joint_grid_completion at grid_phase
+        // 512 with CFO +0.000418 cycles/sample: [101, 101, 64 x7, 72, 72, 81]
+        // (at CFO 0 the tie went to the preamble: 64 x8, 72, 80).
+        pulse_stream_reset();
+        send_run(32'd101, 2, 64'd100);
+        send_run(32'd64, 7, 64'd300);
+        send_symbol(32'd72, 64'd1000, 1'b1);
+        send_symbol(32'd72, 64'd1100, 1'b1);
+        expect_bit("early sync: no detection yet at the true first sync", edge_detected, 1'b0);
+        send_symbol(32'd81, 64'd1200, 1'b1);
+        expect_bit("early sync (tie window read as sync) is detected", edge_detected, 1'b1);
+        expect_bit("early sync: early-sync path", edge_early, 1'b1);
+        expect_bit("early sync: not the split path", edge_split, 1'b0);
+        expect_bit("early sync: no straddle flag (generated rule's windows)", edge_straddle, 1'b0);
+        expect_u16("early sync: preamble bin is the reference", edge_bin, 16'd64);
+        expect_u16("early sync: chips_to_boundary = N - bin", edge_chips, 16'd64);
+        send_symbol(32'd90, 64'd1300, 1'b1);
+        expect_bit("early sync: fires once, not again next symbol", edge_detected, 1'b0);
+        // Outside the reference band it stays shut.
+        pulse_stream_reset();
+        send_run(32'd101, 2, 64'd100);
+        send_run(32'd20, 7, 64'd300);
+        send_symbol(32'd28, 64'd1000, 1'b1);
+        send_symbol(32'd28, 64'd1100, 1'b1);
+        send_symbol(32'd36, 64'd1200, 1'b1);
+        expect_bit("an early-sync pattern at reference bin 20 is below the band", edge_detected, 1'b0);
+        // Silent decisions in the window refuse it.
+        pulse_stream_reset();
+        symbol_peak = 16'd0;
+        send_run(32'd64, 2, 64'd100);
+        symbol_peak = 16'd100;
+        send_run(32'd64, 5, 64'd300);
+        send_symbol(32'd72, 64'd1000, 1'b1);
+        send_symbol(32'd72, 64'd1100, 1'b1);
+        send_symbol(32'd80, 64'd1200, 1'b1);
+        expect_bit("silent decisions in the window refuse the early-sync path", edge_early, 1'b0);
 
         // Things that must NOT be detected.
         pulse_stream_reset();

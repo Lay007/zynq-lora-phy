@@ -21,7 +21,13 @@ function report = run_hdl_generation(options)
 %   report = run_hdl_generation(WordLength=16, SpreadingFactor=7);
 
 arguments
-    options.WordLength (1,1) double {mustBeInteger, mustBePositive} = 16
+    % 20 since #32: at 16 the correlator's window was ~20..5000 input LSB and
+    % weak board packets fell below it; the fraction bits set the floor.
+    options.WordLength (1,1) double {mustBeInteger, mustBePositive} = 20
+    % 40 since #34: |X|^2 for the peak search keeps every bit of the 20-bit
+    % ScaleByM output squared; at 20 it was ufix20_E1 and weak symbols tied
+    % at 0/2 and went to bin 0 (PER 1 at ~6 LSB rms noise on the board).
+    options.PowerWordLength (1,1) double {mustBeInteger, mustBeNonnegative} = 40
     options.SpreadingFactor (1,1) double = 7
     options.SamplesPerChip (1,1) double = 8
     options.Targets (1,:) string = ["fft-correlator-fixed", ...
@@ -58,7 +64,8 @@ entry.modulePrefix = "lora_fft_";
 entry.builder = @() build_fft_correlator_model( ...
     SpreadingFactor=options.SpreadingFactor, ...
     SamplesPerChip=options.SamplesPerChip, DataType="fixed", ...
-    WordLength=options.WordLength, IncludeVerificationTaps=false, ...
+    WordLength=options.WordLength, PowerWordLength=options.PowerWordLength, ...
+    IncludeVerificationTaps=false, ...
     ModelName="lora_fft_correlator_gen");
 targets = [targets; entry];
 
@@ -149,6 +156,20 @@ for k = 1:numel(targets)
         char(target.modulePrefix));
     hdlset_param(char(info.modelName), "ResourceReport", "on");
     hdlset_param(char(info.modelName), "GenerateHDLTestBench", "off");
+    if target.name == "fft-correlator-fixed"
+        % Output registers on the long arithmetic chains, outside the two
+        % accumulator loops (AccumSum/AccumDelay, SpectrumSum/SpectrumDelay),
+        % so the function is unchanged and HDL Coder's delay balancing
+        % aligns the parallel paths. At WordLength 20 the unpipelined core
+        % missed the board clock by 0.446 ns on FFT_N -> ScaleByM ->
+        % MagnitudeSquared -> Confidence divisor (28 levels) and on
+        % resetIn -> Multiply -> AccumDelay (#32, 2026-09-28).
+        dut = char(info.dutPath);
+        hdlset_param([dut '/Multiply'], "OutputPipeline", 1);
+        hdlset_param([dut '/ScaleByM'], "OutputPipeline", 1);
+        hdlset_param([dut '/MagnitudeSquared'], "OutputPipeline", 2);
+        hdlset_param([dut '/GuardedSum'], "OutputPipeline", 1);
+    end
 
     generated = 0;
     failure = "";

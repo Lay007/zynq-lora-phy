@@ -119,6 +119,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/tb/tb_lora_fft_detector_timestamp_path.sv
           vvp /tmp/lora_fft_detector_timestamp_path_tb
@@ -132,6 +133,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/wrappers/lora_peak_triplet_capture.v \
             fpga/wrappers/lora_timestamp_metadata_join.v \
@@ -149,6 +151,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
@@ -169,6 +172,13 @@ jobs:
             fpga/wrappers/lora_symbol_grid_resync.v \
             fpga/tb/tb_lora_symbol_grid_resync.sv
           vvp /tmp/lora_symbol_grid_resync_tb
+      - name: Compile and run CFO derotator testbench
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_cfo_derotator \
+            -o /tmp/lora_cfo_derotator_tb \
+            fpga/wrappers/lora_cfo_derotator.v \
+            fpga/tb/tb_lora_cfo_derotator.sv
+          vvp /tmp/lora_cfo_derotator_tb
       - name: Compile and run joint chirp grid controller testbench
         run: |
           iverilog -g2012 -Wall -s tb_lora_joint_chirp_grid_controller \
@@ -208,6 +218,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
@@ -221,6 +232,7 @@ jobs:
             fpga/wrappers/lora_packet_toa_receiver_top.v \
             fpga/wrappers/lora_async_sample_fifo.v \
             fpga/board/clg400/lora_symbol_trace_buffer.v \
+            fpga/board/clg400/lora_decision_history_buffer.v \
             fpga/board/clg400/lora_clg400_gpreg_bridge.v \
             fpga/tb/tb_lora_clg400_gpreg_bridge.sv
           vvp /tmp/lora_clg400_gpreg_bridge_tb
@@ -280,6 +292,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
@@ -294,6 +307,13 @@ jobs:
             fpga/tb/tb_lora_joint_grid_completion.sv
       - name: Run joint grid completion at grid_phase ${{ matrix.grid_phase }}
         run: vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }}
+      # The packet timestamp must not move with the carrier offset: the
+      # board's typical CFO displacement is about -3.4 samples, and an
+      # upchirp-only timestamp is off by exactly that (fails here by +-3).
+      - name: Run joint grid completion with carrier offset of both signs
+        run: |
+          vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }} +cfo_nano=418000
+          vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }} +cfo_nano=-418000
 
   joint-grid-multi-packet:
     # M6: a capture campaign re-arms with trace_rearm_in between packets
@@ -321,6 +341,7 @@ jobs:
             fpga/wrappers/fft_correlator_route_top.v \
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/wrappers/lora_detector_timestamp_path.v \
+            fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \

@@ -13,7 +13,8 @@ function types = fixed_point_types(spreadingFactor, samplesPerChip, options)
 %   product              complex multiply result
 %   accumulator          frequency partition accumulation
 %   fftN                 second FFT after the exact 1/M scale
-%   magnitudeSquared     |.|^2
+%   magnitudeSquared     |.|^2 as it enters the spectrum sum and confidence
+%   magnitudeWide        |.|^2 as the peak search and the peak output see it
 %   spectrumSum          confidence denominator
 %   confidence           peak / spectrumSum
 %
@@ -32,6 +33,12 @@ arguments
     samplesPerChip (1,1) double
     options.WordLength (1,1) double {mustBeInteger, mustBePositive} = 16
     options.GuardBits (1,1) double {mustBeInteger, mustBeNonnegative} = 1
+    % Word length of |X|^2 where the argmax is taken (#34). 0 keeps it at
+    % WordLength. The range-derived integer part is the same, so a longer
+    % word only adds fraction bits: at 20 bits |X|^2 was ufix20_E1, which
+    % spans ~30 dB of input amplitude and quantized weak symbols to 0/2 --
+    % every tie went to bin 0.
+    options.PowerWordLength (1,1) double {mustBeInteger, mustBeNonnegative} = 0
     options.Rounding (1,1) string = "Floor"
     options.Overflow (1,1) string = "Saturate"
     options.Ranges struct = struct.empty
@@ -62,6 +69,11 @@ types.product = signedType(ranges.product, wordLength, guard);
 types.accumulator = signedType(ranges.partition, wordLength, guard);
 types.fftN = signedType(ranges.fftN, wordLength, guard);
 types.magnitudeSquared = unsignedType(ranges.magnitudeSquared, wordLength, guard);
+powerWordLength = options.PowerWordLength;
+if powerWordLength == 0
+    powerWordLength = wordLength;
+end
+types.magnitudeWide = unsignedType(ranges.magnitudeSquared, powerWordLength, guard);
 types.spectrumSum = unsignedType(ranges.spectrumSum, wordLength, guard);
 % Confidence is a ratio in (0,1]. One integer bit represents 1.0 exactly.
 types.confidence = unsignedType(1, wordLength, guard);

@@ -40,8 +40,10 @@ def test_the_recording_command_detaches_and_records_its_status() -> None:
     # Detached, so the transmission can happen while the buffer fills.
     assert command.rstrip().endswith("&")
     # The exit status has to survive detaching or a failed recording looks
-    # identical to a slow one.
-    assert f"echo $? > {REMOTE_IQ}.done" in command
+    # identical to a slow one. It is iio_readdev's status, taken before the
+    # history freeze runs, not the freeze's.
+    assert f"2>{REMOTE_IQ}.err; s=$?;" in command
+    assert f"echo $s > {REMOTE_IQ}.done" in command
     # A stale recording or sentinel from a previous attempt must not be
     # mistaken for this one.
     assert command.startswith(f"rm -f {REMOTE_IQ} {REMOTE_IQ}.done")
@@ -119,3 +121,70 @@ def test_the_transmitter_is_prepared_before_the_recording_starts() -> None:
     start = source.index("iio_capture_command")
     send = source.index('"send"')
     assert prepare < start < send
+
+
+def test_the_recording_freezes_the_decision_history_before_reporting_done() -> None:
+    """The ring holds ~4 s; the packet is ~1.3 s before the recording ends.
+
+    The freeze has to happen on the board the moment the recording ends. If
+    the host saw the sentinel first, the trace read that follows would take
+    long enough for a missed packet's decisions to be overwritten.
+    """
+
+    command = iio_capture_command(1000, REMOTE_IQ)
+    freeze = command.index("| 8 ))")
+    assert command.index("iio_readdev") < freeze < command.index(f"> {REMOTE_IQ}.done")
+
+
+@pytest.mark.parametrize("full", [True, False])
+def test_every_arm_releases_the_decision_history_freeze(monkeypatch, full) -> None:
+    scripts = []
+    monkeypatch.setattr(tool, "_run_remote", lambda args, script: scripts.append(script) or "armed")
+
+    tool.arm_receive_stream(object(), full=full)
+
+    script = scripts[0]
+    # Both the pulse value and the run value clear bit 3.
+    assert "orig & 0xFFFFFFF7" in script
+    run_line = next(line for line in script.splitlines() if line.startswith("run="))
+    mask = int(run_line.split("& ")[1].rstrip("))"), 0)
+    assert not mask & 0x8
+
+
+
+def _ok_report(**joint) -> dict:
+    base = {"precise_correction_applied": True}
+    base.update(joint)
+    return {"decode": {"crc_valid": True}, "joint_estimate": base}
+
+
+def test_an_ordinary_decoded_packet_does_not_keep_its_recording() -> None:
+    assert not tool.iq_worth_keeping(_ok_report())
+
+
+@pytest.mark.parametrize(
+    "flag",
+    [
+        "detector_straddle_accepted",
+        "detector_split_accepted",
+        "detector_early_sync_accepted",
+        "up_search_aborted",
+        "down_search_aborted",
+        "timing_rejected_out_of_range",
+    ],
+)
+def test_a_rescued_or_irregular_packet_keeps_its_recording(flag) -> None:
+    assert tool.iq_worth_keeping(_ok_report(**{flag: True}))
+
+
+def test_a_crc_failure_or_an_unapplied_estimate_keeps_its_recording() -> None:
+    bad_crc = _ok_report()
+    bad_crc["decode"]["crc_valid"] = False
+    assert tool.iq_worth_keeping(bad_crc)
+    assert tool.iq_worth_keeping(_ok_report(precise_correction_applied=False))
+    assert tool.iq_worth_keeping({"decode": {"crc_valid": True}})
+
+
+def test_keep_iq_defaults_to_keeping_everything(monkeypatch) -> None:
+    monkeypatch.setattr("sys.argv", ["x", "--run-dir", "r"])
+    assert tool.parse_args().keep_iq == "all"

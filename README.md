@@ -16,21 +16,19 @@ companion [`zynq-sdr-course`](https://github.com/Lay007/zynq-sdr-course). The
 [project-boundary ADR](docs/architecture-decisions/0003-course-project-boundary.md)
 defines why generated LoRa HDL is not duplicated there.
 
-> Status: MATLAB M1 is complete: continuous configured-IQ packet acquisition,
-> hard/soft LoRa decoding, end-to-end BER/PER, fractional ToA, and calibrated
-> 2D TDoA are executable and regression-tested, including recorded SX1262 IQ.
-> M2 now includes the streaming fixed-point correlator, joint timing/CFO and
-> frequency-only estimators, blind packet-start detection, sample-grid
-> realignment, SFD acceptance, packet framing, reset behavior, coarse
-> timestamps, and fractional ToA. M3 has namespaced generated Verilog,
-> exact 8/8 HDL cosimulation for ToA, core-only post-route evidence, and a full
-> portable SF7/L=8 IQ-to-AXI timestamp receiver synthesized for
-> `xc7z020clg400-2`. A CLG400 overlay now connects that receiver to the vendor
-> AD9361 RX1 stream and exposes atomic metadata through a PS gpreg window.
-> The eight generated cores are now packaged as catalog-verified Vivado IP;
-> hardware validation remains open. M4-M6 hardware
-> reception and synchronized positioning have not started, so the repository
-> does not yet claim a hardware LoRa receiver.
+> Status: MATLAB M1 and the streaming fixed-point M2 path are complete, with
+> generated M3 Verilog, exact 8/8 HDL cosimulation for ToA, Vivado IP packaging,
+> a routed CLG400 board design, and a cold-bootable ZynqSDR image. Hardware
+> reception is now demonstrated: real over-the-air Heltec V4.3/SX1262 packets
+> decode on ZynqSDR with valid explicit header and payload CRC. In the latest
+> 500-attempt M7 guard-image campaign, 492 packets were captured and all 492
+> passed CRC with zero PL grid errors; the other attempts included five
+> transmitter-side failures and three PL detector misses. The M6 continuous PL
+> sample-time counter was also verified across 47 captures spanning 803.7 s.
+> Controlled cable-delay calibration, the 1,000-packet qualification target,
+> common-time synchronization across receivers, and hardware multi-receiver
+> TDoA positioning remain open, so the repository does not yet claim a
+> synchronized positioning system.
 
 ## Project goals
 
@@ -44,12 +42,22 @@ defines why generated LoRa HDL is not duplicated there.
 - Keep experiments reproducible through versioned configurations, captures,
   metrics, and reports.
 
-The first hardware milestone is deliberately narrow:
+### Engineering collaboration
 
-> Complete and validate the MATLAB floating-point PHY and ToA/TDoA algorithms,
-> beginning with the receiver at BW 125 kHz and SF7. Then reproduce HDL-bound
-> blocks as a streaming Simulink model and generate dechirp, FFT, peak-detector,
-> and timing Verilog from that model using the same test vectors.
+This repository also serves as public evidence for focused R&D work in LoRa/CSS
+PHY, SDR acquisition, packet timing, ToA/TDoA, MATLAB/Simulink-to-FPGA flows,
+and measurement-driven verification. For consulting or project collaboration,
+see the [engineering portfolio](https://lay007.github.io/) or
+[GitHub profile](https://github.com/Lay007).
+
+
+The current hardware qualification focus is deliberately narrow:
+
+> Stabilize and quantify the SF7 / BW 125 kHz hardware receiver, complete the
+> controlled packet/PER campaign, calibrate the single-receiver timing chain,
+> and only then extend the validated timestamp path to synchronized
+> multi-receiver TDoA. MATLAB, Simulink, generated HDL, raw IQ, PL metadata, and
+> hardware measurements remain tied to shared acceptance evidence.
 
 ## Current contents
 

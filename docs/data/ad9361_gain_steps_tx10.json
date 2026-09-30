@@ -1,0 +1,79 @@
+{
+ "date": "2026-09-30T14:53",
+ "tx_atten_db": 10.0,
+ "setup": "tone +50 kHz at -14 dBFS through lora_tx_noise (SNR 60 dB), TX1 - step 20 dB - fixed 30 dB - RX1; RX DMA running, so the DAC plays at 0.5 MS/s",
+ "rows": [
+  {
+   "gain_set_db": 0,
+   "tone_lsb2": 0.00496767293877321,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 2.0,
+   "tone_rel_db": -40.71741355852366,
+   "gain_error_db": -0.7174135585236598
+  },
+  {
+   "gain_set_db": 5,
+   "tone_lsb2": 0.019501477188521747,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 2.0,
+   "tone_rel_db": -34.778268415808846,
+   "gain_error_db": 0.22173158419115424
+  },
+  {
+   "gain_set_db": 10,
+   "tone_lsb2": 0.07291756063452721,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 2.0,
+   "tone_rel_db": -29.050622194699415,
+   "gain_error_db": 0.9493778053005855
+  },
+  {
+   "gain_set_db": 15,
+   "tone_lsb2": 0.2528471053916921,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 3.0,
+   "tone_rel_db": -23.65036364750445,
+   "gain_error_db": 1.3496363524955513
+  },
+  {
+   "gain_set_db": 20,
+   "tone_lsb2": 0.6811241144003864,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 4.0,
+   "tone_rel_db": -19.34668094677537,
+   "gain_error_db": 0.6533190532246316
+  },
+  {
+   "gain_set_db": 25,
+   "tone_lsb2": 2.046398176572229,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 5.0,
+   "tone_rel_db": -14.569042107591779,
+   "gain_error_db": 0.43095789240822135
+  },
+  {
+   "gain_set_db": 30,
+   "tone_lsb2": 7.085004236363915,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 8.0,
+   "tone_rel_db": -9.175542366561514,
+   "gain_error_db": 0.8244576334384863
+  },
+  {
+   "gain_set_db": 35,
+   "tone_lsb2": 17.41734752305467,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 10.0,
+   "tone_rel_db": -5.269123336464982,
+   "gain_error_db": -0.26912333646498166
+  },
+  {
+   "gain_set_db": 40,
+   "tone_lsb2": 58.599559436993616,
+   "tone_hz": 25001.52587890625,
+   "peak_abs": 17.0,
+   "tone_rel_db": 0.0,
+   "gain_error_db": 0.0
+  }
+ ]
+}

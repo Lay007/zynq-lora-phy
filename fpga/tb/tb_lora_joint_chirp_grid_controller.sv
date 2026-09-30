@@ -36,6 +36,8 @@ module tb_lora_joint_chirp_grid_controller;
     wire down_search_abort_error;
     wire precise_correction_applied;
     wire signed [15:0] diag_up_offset_frac_q12;
+    wire [63:0] toa_coarse;
+    wire signed [31:0] toa_fraction_q12;
 
     integer errors = 0;
 
@@ -77,7 +79,9 @@ module tb_lora_joint_chirp_grid_controller;
         .timing_range_error(timing_range_error),
         .up_search_abort_error(up_search_abort_error),
         .down_search_abort_error(down_search_abort_error),
-        .precise_correction_applied(precise_correction_applied)
+        .precise_correction_applied(precise_correction_applied),
+        .toa_coarse(toa_coarse),
+        .toa_fraction_q12(toa_fraction_q12)
     );
 
     task automatic pulse_packet(
@@ -178,6 +182,24 @@ module tb_lora_joint_chirp_grid_controller;
         end
     endtask
 
+    // The packet time of arrival handed to the metadata path: up coarse start
+    // plus (up + down) / 2, as a whole sample and a Q12 remainder. It must be
+    // the joint time, not the up leg's peak, which a carrier offset moves.
+    task automatic expect_toa(
+        input [63:0] expected_coarse,
+        input signed [31:0] expected_fraction
+    );
+        begin
+            if (toa_coarse !== expected_coarse || toa_fraction_q12 !== expected_fraction) begin
+                errors = errors + 1;
+                $display("FAIL toa coarse=%0d fraction=%0d expected %0d %0d",
+                         toa_coarse, toa_fraction_q12, expected_coarse, expected_fraction);
+            end else begin
+                $display("PASS toa coarse=%0d fraction_q12=%0d", toa_coarse, toa_fraction_q12);
+            end
+        end
+    endtask
+
     initial begin
         repeat (4) @(posedge clk);
         resetn <= 1'b1;
@@ -192,6 +214,7 @@ module tb_lora_joint_chirp_grid_controller;
         wait_search(1'b1, 64'd20680);
         return_peak(64'd20694);
         expect_result(32'sd11, 32'd27);
+        expect_toa(64'd10451, 32'sd0);
 
         // Synthetic negative half-sum: chirp origin 30832 is 192 samples
         // before FFT window 31024 (previous window 30000); its forward phase
@@ -202,6 +225,8 @@ module tb_lora_joint_chirp_grid_controller;
         wait_search(1'b1, 64'd41072);
         return_peak(64'd41074);
         expect_result(-32'sd2, 32'd14);
+        // -1.5 rounds away to -2, leaving +0.5 sample: 30830 + 2048/4096.
+        expect_toa(64'd30830, 32'sd2048);
 
         // Synthetic positive half-sum: chirp origin 50872 is 152 before 51024,
         // so its forward phase is (1024-152)/8 = 109 chips.
@@ -212,6 +237,19 @@ module tb_lora_joint_chirp_grid_controller;
         wait_search(1'b1, 64'd61112);
         return_peak(64'd61117);
         expect_result(32'sd2, 32'd18);
+
+        // A carrier offset: the up leg's peak sits 3.75 samples early and the
+        // down leg's 2.875 late (equal and opposite about the true time plus
+        // the timing). The up peak alone would put the packet at 10436.25;
+        // the joint time is (-3.75 + 2.875) / 2 = -0.4375 from the coarse
+        // start, i.e. 10440 with a -1792/4096 remainder.
+        pulse_packet(64'd10000, 16'd55);
+        wait_search(1'b0, 64'd10440);
+        return_peak(64'd10436, 16'sd1024);
+        wait_search(1'b1, 64'd20680);
+        return_peak(64'd20683, -16'sd512);
+        expect_result(32'sd0, 32'd16);
+        expect_toa(64'd10440, -32'sd1792);
 
         // A packet at 60512 lies halfway between grid origins 60000/61024.
         // The later decision window represents it; phase 64 chips must point

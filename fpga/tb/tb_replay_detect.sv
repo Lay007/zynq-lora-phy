@@ -10,7 +10,7 @@
 // met the SFD deadline".
 //
 // Output lines: SYM <bin> <window origin>, PRE <bin> <chips> n=<sample>,
-// SYN n=<sample>, DET <bin> <chips> n=<sample> straddle=<0|1>, PSC <packet_start_count>
+// SYN n=<sample>, DET <bin> <chips> n=<sample> straddle=<0|1> split=<0|1> early=<0|1>, META <coarse> <frac_q12>, PSC <packet_start_count>
 // n=<sample>, JNT <joint controller result>, DONE.
 //
 // Compile from the repo root (the reference ROM path is relative) with the
@@ -157,7 +157,7 @@ module tb_replay_detect;
     );
 
 
-    reg [31:0] mem [0:65535];
+    reg [31:0] mem [0:262143];
     integer n_samples = 0;
     integer i;
     integer det_count = 0;
@@ -165,6 +165,20 @@ module tb_replay_detect;
     integer sample_cnt = 0;
     integer joint_wait = 0;
     integer wait_joint = 1;
+    // +gap=N: one sample every N clocks, as on the board (about 63). With the
+    // default 1 the joint search finishes after the whole stream, so nothing
+    // that depends on its result in time (grid correction, CFO removal) acts
+    // on the packet's own symbols.
+    integer gap = 1;
+    // +gap_det=N: one sample every N clocks only from the detection until the
+    // joint search reports, 1 elsewhere. That is the only stretch where the
+    // clocks-per-sample ratio changes anything (the search has to finish before
+    // the header), so the header and payload decisions come out as with +gap
+    // for the whole stream, in a small fraction of the simulated clocks.
+    integer gap_det = 1;
+    integer g;
+    integer this_gap;
+    reg det_seen = 1'b0;
     reg joint_done = 1'b0;
 
     task automatic axi_write(input [5:0] address, input [31:0] value);
@@ -206,10 +220,22 @@ module tb_replay_detect;
             end
             if (sync_valid)
                 $display("SYN n=%0d", sample_cnt);
+            // The packet's final timestamp as software receives it: coarse
+            // sample count and Q12 fraction (the up leg's peak, see
+            // lora_packet_toa_receiver_top's u_metadata_join).
+            if (metadata_valid)
+                $display("META %0d %0d", metadata_coarse, $signed(metadata_fractional_q12));
             if (detected) begin
+                det_seen = 1'b1;
                 det_count = det_count + 1;
-                $display("DET %0d %0d n=%0d straddle=%0d", dut.preamble_bin, dut.chips_to_boundary,
+`ifdef REPLAY_NO_SPLIT
+                $display("DET %0d %0d n=%0d straddle=%0d split=0 early=0", dut.preamble_bin, dut.chips_to_boundary,
                          sample_cnt, dut.packet_straddle_detected);
+`else
+                $display("DET %0d %0d n=%0d straddle=%0d split=%0d early=%0d", dut.preamble_bin, dut.chips_to_boundary,
+                         sample_cnt, dut.packet_straddle_detected, dut.packet_split_detected,
+                         dut.packet_early_sync_detected);
+`endif
             end
         end
     end
@@ -223,6 +249,8 @@ module tb_replay_detect;
         // +wait_joint=0: stop after the last sample instead of waiting for
         // the joint search (much faster when only detection matters).
         if (!$value$plusargs("wait_joint=%d", wait_joint)) wait_joint = 1;
+        if (!$value$plusargs("gap=%d", gap)) gap = 1;
+        if (!$value$plusargs("gap_det=%d", gap_det)) gap_det = 1;
         $readmemh(iq_file, mem);
         $display("MEM %h %h %h n=%0d file=[%0s]", mem[0], mem[5000], mem[9000], n_samples, iq_file);
         repeat (6) @(posedge clk);
@@ -234,6 +262,11 @@ module tb_replay_detect;
             iq_in_re <= $signed(mem[i][31:16]);
             iq_in_im <= $signed(mem[i][15:0]);
             valid_in <= 1'b1;
+            this_gap = (det_seen && !joint_done && gap_det > gap) ? gap_det : gap;
+            for (g = 1; g < this_gap; g = g + 1) begin
+                @(negedge clk);
+                valid_in <= 1'b0;
+            end
         end
         @(negedge clk);
         valid_in <= 1'b0;

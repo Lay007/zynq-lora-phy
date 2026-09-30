@@ -170,6 +170,36 @@ module tb_lora_packet_toa_receiver_top;
         end
     endtask
 
+    // A downchirp: the conjugate of symbol 0, for `count` samples (1024 for a
+    // full SFD symbol, 256 for the final quarter). The joint grid's down leg
+    // searches for it 10 symbols after the first preamble upchirp, so a
+    // stimulus without it gives the down search nothing physical to find and
+    // the packet timestamp (the joint (up + down) / 2 time) nothing to mean.
+    task automatic drive_css_downchirp(input integer count);
+        integer n;
+        integer source_n;
+        integer q_re;
+        integer q_im;
+        real phase_cycles;
+        real angle;
+        begin
+            for (n = 0; n < count; n = n + 1) begin
+                source_n = n;
+                phase_cycles = (0.5 * source_n * source_n) /
+                               (SYMBOL_COUNT * SAMPLES_PER_CHIP *
+                                SAMPLES_PER_CHIP) -
+                               (0.5 * source_n) / SAMPLES_PER_CHIP;
+                angle = 2.0 * PI * phase_cycles;
+                q_re = quantize_q10($cos(angle));
+                q_im = quantize_q10(-$sin(angle));
+                @(negedge clk);
+                iq_in_re <= q_re;
+                iq_in_im <= q_im;
+                valid_in <= 1'b1;
+            end
+        end
+    endtask
+
     task automatic axi_write(input [5:0] address, input [31:0] value);
         begin
             @(negedge clk);
@@ -206,7 +236,9 @@ module tb_lora_packet_toa_receiver_top;
         #1;
         if (resetn) begin
             if (symbol_valid) begin
-                if (symbol_seen >= 11 || symbol_index !== expected_symbol[symbol_seen]) begin
+                // The first eleven are the detection stimulus; the SFD and
+                // header decisions after them are not asserted here.
+                if (symbol_seen < 11 && symbol_index !== expected_symbol[symbol_seen]) begin
                     errors = errors + 1;
                     $display("FAIL integrated symbol[%0d] got=%0d", symbol_seen,
                              symbol_index);
@@ -221,8 +253,13 @@ module tb_lora_packet_toa_receiver_top;
                              packet_start_count);
                 end
             end
+            // Two searches, each 2*16+1 correlations: the up leg around the
+            // first preamble upchirp (1024 - 16 ..), then the down leg around
+            // the first SFD downchirp, ten symbols later (11264 - 16 ..).
             if (correlation_magnitude_valid) begin
-                if (correlation_sample_count !== 64'd1008 + correlation_seen) begin
+                if (correlation_sample_count !== (correlation_seen < 33
+                        ? 64'd1008 + correlation_seen
+                        : 64'd11248 + (correlation_seen - 33))) begin
                     errors = errors + 1;
                     $display("FAIL integrated correlation count[%0d] got=%0d",
                              correlation_seen, correlation_sample_count);
@@ -285,34 +322,45 @@ module tb_lora_packet_toa_receiver_top;
         drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
         drive_css_symbol(0); drive_css_symbol(0);
         drive_css_symbol(8); drive_css_symbol(16);
+        // The packet timestamp is the joint (up + down) / 2 time, so the
+        // down leg needs its real SFD and the samples after it.
+        drive_css_downchirp(1024); drive_css_downchirp(1024); drive_css_downchirp(256);
+        drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
+        drive_css_symbol(0);
         @(negedge clk);
         valid_in <= 1'b0;
         iq_in_re <= 16'sd0;
         iq_in_im <= 16'sd0;
 
-        while (metadata_seen == 0 && timeout_cycles < 100000) begin
+        while (metadata_seen == 0 && timeout_cycles < 400000) begin
             @(posedge clk);
             timeout_cycles = timeout_cycles + 1;
         end
         repeat (5) @(posedge clk);
 
-        if (symbol_seen != 11 || packet_start_seen != 1 ||
-            correlation_seen != 33 || triplet_seen != 1 ||
-            toa_seen != 1 || metadata_seen != 1) begin
+        // One packet: one packet start, the up leg's triplet (peak_triplet_valid
+        // is the up leg only), both legs interpolated, and one timestamp --
+        // the joint (up + down) / 2 time, which with no carrier offset is the
+        // first preamble upchirp exactly (checked at 1024 above).
+        if (symbol_seen < 11 || packet_start_seen != 1 ||
+            correlation_seen != 66 || triplet_seen != 1 ||
+            toa_seen != 2 || metadata_seen != 1) begin
             errors = errors + 1;
             $display("FAIL event counts symbols=%0d packet=%0d corr=%0d triplet=%0d toa=%0d metadata=%0d",
                      symbol_seen, packet_start_seen, correlation_seen,
                      triplet_seen, toa_seen, metadata_seen);
         end
-        if (history_next_sample_count !== 64'd11264 ||
-            history_samples_retained !== 32'd11264 ||
+        // 11 symbols of detection stimulus, 2.25 of SFD, 4 of header.
+        if (history_next_sample_count !== 64'd17664 ||
+            history_samples_retained !== 32'd17664 ||
             history_oldest_sample_count !== 64'd0) begin
             errors = errors + 1;
             $display("FAIL history accounting next=%0d retained=%0d oldest=%0d",
                      history_next_sample_count, history_samples_retained,
                      history_oldest_sample_count);
         end
-        if (toa_search_first_count !== 64'd1008) begin
+        // The last search launched is the down leg's.
+        if (toa_search_first_count !== 64'd11248) begin
             errors = errors + 1;
             $display("FAIL integrated search first count=%0d", toa_search_first_count);
         end

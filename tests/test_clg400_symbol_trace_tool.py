@@ -5,6 +5,7 @@ from tools.read_clg400_symbol_trace import (
     ClockAccounting,
     _clock_summary,
     TraceNotComplete,
+    parse_history,
     _joint_summary,
     grid_phase,
     parse_trace,
@@ -262,6 +263,7 @@ def _joint_page(
     timing_rejected_out_of_range: bool = False,
     precise_correction_applied: bool = False,
     detector_straddle_accepted: bool = False,
+    detector_split_accepted: bool = False,
     marker: int = 0x4A54,
 ) -> str:
     status = (
@@ -272,6 +274,7 @@ def _joint_page(
         | (8 if timing_rejected_out_of_range else 0)
         | (16 if precise_correction_applied else 0)
         | (32 if detector_straddle_accepted else 0)
+        | (64 if detector_split_accepted else 0)
     )
     packed = (chips << 16) | bin_
     return (
@@ -366,6 +369,28 @@ def test_joint_page_reports_the_straddle_accepted_bit_on_its_own() -> None:
     assert both.detector_straddle_accepted and both.precise_correction_applied
 
 
+def test_joint_page_reports_the_split_accepted_bit_on_its_own() -> None:
+    """STATUS bit 6 (M9): accepted only through the split-tolerant path."""
+
+    text = _trace_page(grid_realigned=False).replace(
+        "SIGNATURE 0x4c4f5241",
+        "SIGNATURE 0x4c4f5241" + chr(10) + _joint_page(detector_split_accepted=True),
+    )
+    joint = parse_trace(text).joint
+    assert joint is not None
+    assert joint.detector_split_accepted
+    assert not joint.detector_straddle_accepted
+
+    plain = parse_trace(
+        _trace_page(grid_realigned=False).replace(
+            "SIGNATURE 0x4c4f5241",
+            "SIGNATURE 0x4c4f5241" + chr(10) + _joint_page(detector_straddle_accepted=True),
+        )
+    ).joint
+    assert plain is not None
+    assert plain.detector_straddle_accepted and not plain.detector_split_accepted
+
+
 def test_joint_summary_recomputes_the_controllers_origin() -> None:
     """The controller derives up_coarse_start from these two inputs.
 
@@ -428,7 +453,7 @@ def test_an_unfinished_trace_reports_what_the_rest_of_the_logic_saw() -> None:
 
     extra = "\n".join(
         [
-            "PAGE0 0x00011243 0x00000007 0x000f4240 0x00000001",
+            "PAGE0 0x00011243 0x00000007 0x000f4240 0x00000001 0xfffff800 0x00012345",
             _joint_page(seen=False),
             _clock_page(overflow=True),
         ]
@@ -440,7 +465,9 @@ def test_an_unfinished_trace_reports_what_the_rest_of_the_logic_saw() -> None:
     state = caught.value.state
     assert state["page0_status"] == "0x00011243"
     assert state["page0_sequence"] == 7
-    assert state["page0_coarse_lo"] == 0x000F4240
+    assert state["page0_coarse"] == 0x1_000F_4240
+    assert state["page0_fraction_q12"] == -2048
+    assert state["page0_log_peak_q12"] == 0x12345
     assert state["joint_seen"] is False
     assert state["crossing_overflow"] is True
     assert state["capture_sequence"] == 3
@@ -452,3 +479,93 @@ def test_an_unfinished_trace_without_the_extra_pages_still_raises() -> None:
 
     assert "page0_status" not in caught.value.state
     assert isinstance(caught.value, ValueError)
+
+
+def _history_page(newest: int, written: int, drops: int, entries: dict[int, tuple]) -> str:
+    lines = [f"HSTATUS 0x{(0x4448 << 16) | (1 << 12) | newest:08x} 0x{written:08x} 0x{drops:08x}"]
+    for index in range(8):
+        if index in entries:
+            count, bin_, conf, drop, flags = entries[index]
+            packed = (flags << 24) | (drop << 16) | conf
+            lines.append(f"H {index} 0x{count:08x} 0x{packed:08x} 0x{bin_:08x}")
+        else:
+            lines.append(f"H {index} 0x00000000 0x00000000 0x00000000")
+    return "\n".join(lines)
+
+
+def test_history_before_the_ring_wraps_is_read_from_entry_zero() -> None:
+    text = _history_page(
+        newest=2, written=3, drops=5,
+        entries={0: (1000, 0, 0, 0, 1), 1: (2024, 64, 0x300, 0, 1), 2: (3048, 72, 0x310, 5, 0b1011)},
+    )
+
+    history = parse_history(text, depth=8)
+
+    assert history["frozen"] is True
+    assert history["crossing_drop_count"] == 5
+    assert [e["sample_count_low"] for e in history["entries"]] == [1000, 2024, 3048]
+    last = history["entries"][-1]
+    assert last["bin"] == 72 and last["confidence_q15"] == 0x310
+    assert last["drop_count_low"] == 5
+    assert last["detected"] and not last["straddle"] and last["grid_resync_armed"]
+
+
+def test_a_wrapped_ring_is_read_oldest_first_from_after_the_newest_entry() -> None:
+    entries = {i: (100 * i, i, 1, 0, 1) for i in range(8)}
+
+    history = parse_history(_history_page(newest=2, written=20, drops=0, entries=entries), depth=8)
+
+    assert [e["index"] for e in history["entries"]] == [3, 4, 5, 6, 7, 0, 1, 2]
+
+
+def test_history_on_an_image_without_the_page_is_refused() -> None:
+    with pytest.raises(ValueError, match="predates the M8"):
+        parse_history("HSTATUS 0x00011243 0x00000007 0x00000000\nH 0 0x0 0x0 0x0", depth=1)
+
+
+def test_the_history_line_adds_the_crossing_drop_count_to_the_clock() -> None:
+    text = _trace_page(grid_realigned=False).replace(
+        "SIGNATURE 0x4c4f5241",
+        "SIGNATURE 0x4c4f5241\nHISTORY 0x44480123 0x00000400 0x00000007\n" + _clock_page(),
+    )
+
+    trace = parse_trace(text)
+
+    assert trace.clock is not None and trace.clock.crossing_drop_count == 7
+
+
+def test_an_old_image_reports_no_drop_count() -> None:
+    # Bit 4 selects nothing on older images: the read falls through to page 0.
+    text = _trace_page(grid_realigned=False).replace(
+        "SIGNATURE 0x4c4f5241",
+        "SIGNATURE 0x4c4f5241\nHISTORY 0x00011243 0x00000009 0x00012345\n" + _clock_page(),
+    )
+
+    trace = parse_trace(text)
+
+    assert trace.clock is not None and trace.clock.crossing_drop_count is None
+
+
+def test_a_completed_trace_carries_the_published_timestamp() -> None:
+    text = _trace_page(grid_realigned=True).replace(
+        "SIGNATURE 0x4c4f5241",
+        "SIGNATURE 0x4c4f5241\nPAGE0 0x00011267 0x00000009 0x02345678 0x00000000 0x00000400 0x00001000",
+    )
+
+    trace = parse_trace(text)
+
+    assert trace.timestamp == {
+        "page0_status": "0x00011267",
+        "page0_sequence": 9,
+        "page0_coarse": 0x02345678,
+        "page0_fraction_q12": 1024,
+        "page0_log_peak_q12": 4096,
+    }
+    assert build_report_timestamp(trace) == trace.timestamp
+
+
+def build_report_timestamp(trace):
+    from tools.read_clg400_symbol_trace import build_report
+
+    return build_report(trace)["timestamp"]
+

@@ -11,7 +11,10 @@ The floating-point reference separates three timing quantities:
 
 `lora_phy.estimate_fractional_toa` correlates a known complex reference with
 the capture, normalizes every candidate by reference and window energy, and
-fits a three-point parabola to correlation power around the integer peak. It
+fits a three-point parabola to the logarithm of the correlation magnitude
+around the integer peak, bounded to +/-0.5 sample
+(`matched-filter-log-magnitude-v1`; the MATLAB source gives 0.0066 sample RMS
+against 0.0625 for a parabola on power). It
 also reports normalized peak score and peak-to-sidelobe ratio. An optional
 coarse start and search radius keep the fine estimator on the intended packet.
 

@@ -101,6 +101,13 @@ module tb_lora_joint_grid_completion;
     // which is why a search fifty-nine times over its deadline looked
     // comfortable here. The board checks the ratio now; simulation cannot.
     integer sample_gap = 0;
+    // +cfo_nano=N applies a carrier offset of N * 1e-9 cycles per sample to
+    // the whole stimulus (418000 gives the board's typical -3.4-sample CFO
+    // displacement). The packet timestamp must not move with it: it is the
+    // joint (up + down) / 2 time, and an upchirp-only timestamp would be off
+    // by the displacement.
+    integer cfo_nano = 0;
+    integer driven_samples = 0;
     // On the board the packet lands at an arbitrary phase, so chips_to_boundary
     // sweeps the whole symbol and the coarse resync withholds a large advance.
     // A packet driven straight onto the grid gives chips_to_boundary = 0 and
@@ -207,9 +214,49 @@ module tb_lora_joint_grid_completion;
                                (SYMBOL_COUNT * SAMPLES_PER_CHIP *
                                 SAMPLES_PER_CHIP) -
                                (0.5 * source_n) / SAMPLES_PER_CHIP;
-                angle = 2.0 * PI * phase_cycles;
+                angle = 2.0 * PI * phase_cycles
+                        + 2.0 * PI * (cfo_nano * 1.0e-9) * driven_samples;
                 q_re = quantize_q10($cos(angle));
                 q_im = quantize_q10($sin(angle));
+                driven_samples = driven_samples + 1;
+                @(negedge clk);
+                iq_in_re <= q_re;
+                iq_in_im <= q_im;
+                valid_in <= 1'b1;
+                if (sample_gap > 0) begin
+                    @(negedge clk);
+                    valid_in <= 1'b0;
+                    repeat (sample_gap - 1) @(negedge clk);
+                end
+            end
+        end
+    endtask
+
+    // A downchirp: the conjugate of symbol 0, for `count` samples (1024 for a
+    // full SFD symbol, 256 for the final quarter). The joint grid's down leg
+    // searches for it 10 symbols after the first preamble upchirp, so a
+    // stimulus without it gives the down search nothing physical to find and
+    // the packet timestamp (the joint (up + down) / 2 time) nothing to mean.
+    task automatic drive_css_downchirp(input integer count);
+        integer n;
+        integer source_n;
+        integer q_re;
+        integer q_im;
+        real phase_cycles;
+        real angle;
+        begin
+            for (n = 0; n < count; n = n + 1) begin
+                source_n = n;
+                phase_cycles = (0.5 * source_n * source_n) /
+                               (SYMBOL_COUNT * SAMPLES_PER_CHIP *
+                                SAMPLES_PER_CHIP) -
+                               (0.5 * source_n) / SAMPLES_PER_CHIP;
+                // conj(chirp) * exp(j*cfo): angle is -chirp + cfo
+                angle = -2.0 * PI * phase_cycles
+                        + 2.0 * PI * (cfo_nano * 1.0e-9) * driven_samples;
+                q_re = quantize_q10($cos(angle));
+                q_im = quantize_q10($sin(angle));
+                driven_samples = driven_samples + 1;
                 @(negedge clk);
                 iq_in_re <= q_re;
                 iq_in_im <= q_im;
@@ -231,6 +278,7 @@ module tb_lora_joint_grid_completion;
                 iq_in_re <= 16'sd0;
                 iq_in_im <= 16'sd0;
                 valid_in <= 1'b1;
+                driven_samples = driven_samples + 1;
                 if (sample_gap > 0) begin
                     @(negedge clk);
                     valid_in <= 1'b0;
@@ -373,7 +421,9 @@ module tb_lora_joint_grid_completion;
             grid_phase = 0;
         if (!$value$plusargs("coarse_skip=%d", coarse_skip))
             coarse_skip = 0;
-        $display("INFO sample_gap=%0d grid_phase=%0d coarse_skip=%0d", sample_gap, grid_phase, coarse_skip);
+        if (!$value$plusargs("cfo_nano=%d", cfo_nano))
+            cfo_nano = 0;
+        $display("INFO sample_gap=%0d grid_phase=%0d coarse_skip=%0d cfo_nano=%0d", sample_gap, grid_phase, coarse_skip, cfo_nano);
         repeat (6) @(posedge clk);
         resetn <= 1'b1;
         repeat (3) @(posedge clk);
@@ -388,11 +438,13 @@ module tb_lora_joint_grid_completion;
         drive_css_symbol(0); drive_css_symbol(0);
         drive_css_symbol(8); drive_css_symbol(16);
         // Everything above is the detection stimulus shared with
-        // tb_lora_packet_toa_receiver_top. Past this point the samples exist
-        // only so the down search window arrives; their content does not have
-        // to be a true SFD for the completion check.
+        // tb_lora_packet_toa_receiver_top. Then a real SFD, which the joint
+        // grid's down leg searches for (the packet timestamp is the joint
+        // (up + down) / 2 time, so a down leg locked onto an upchirp would
+        // move it), and a few header symbols so its window completes.
+        drive_css_downchirp(1024); drive_css_downchirp(1024); drive_css_downchirp(256);
         drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
-        drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
+        drive_css_symbol(0);
         @(negedge clk);
         valid_in <= 1'b0;
         iq_in_re <= 16'sd0;

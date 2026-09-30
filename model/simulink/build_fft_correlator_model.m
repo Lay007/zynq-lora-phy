@@ -50,6 +50,7 @@ arguments
         ["double", "fixed"])} = "double"
     options.WordLength (1,1) double {mustBeInteger, mustBePositive} = 16
     options.GuardBits (1,1) double {mustBeInteger, mustBeNonnegative} = 1
+    options.PowerWordLength (1,1) double {mustBeInteger, mustBeNonnegative} = 0
     options.Rounding (1,1) string = "Floor"
     options.Overflow (1,1) string = "Saturate"
     options.Ranges struct = struct.empty
@@ -69,7 +70,8 @@ isFixed = options.DataType == "fixed";
 if isFixed
     types = lora_sim.fixed_point_types(config.spreadingFactor, ...
         config.samplesPerChip, WordLength=options.WordLength, ...
-        GuardBits=options.GuardBits, Rounding=options.Rounding, ...
+        GuardBits=options.GuardBits, PowerWordLength=options.PowerWordLength, ...
+        Rounding=options.Rounding, ...
         Overflow=options.Overflow, Ranges=options.Ranges);
 else
     types = struct.empty;
@@ -455,8 +457,17 @@ add_line(dut, "FFT_N/1", "ScaleByM/1", autorouting="on");
 add_block("simulink/Math Operations/Math Function", ...
     dut+"/MagnitudeSquared", Position=[1340 80 1400 120]);
 set_param(dut+"/MagnitudeSquared", Operator="magnitude^2");
-applyType(dut+"/MagnitudeSquared", isFixed, types, "magnitudeSquared");
+% |X|^2 is kept at magnitudeWide for the peak search (#34); the spectrum sum
+% and the confidence divider take the narrower magnitudeSquared, so the
+% divider and the core latency do not change with PowerWordLength. With
+% PowerWordLength equal to WordLength both conversions are identities.
+applyType(dut+"/MagnitudeSquared", isFixed, types, "magnitudeWide");
 add_line(dut, "ScaleByM/1", "MagnitudeSquared/1", autorouting="on");
+
+add_block("simulink/Signal Attributes/Data Type Conversion", ...
+    dut+"/MagNarrow", Position=[1440 140 1490 170]);
+applyType(dut+"/MagNarrow", isFixed, types, "magnitudeSquared", "double");
+add_line(dut, "MagnitudeSquared/1", "MagNarrow/1", autorouting="on");
 
 % --- spectrum sum ----------------------------------------------------------
 add_block("simulink/User-Defined Functions/MATLAB Function", ...
@@ -509,7 +520,7 @@ add_block("simulink/Signal Routing/Switch", dut+"/SpectrumGate", ...
     Position=[1540 320 1580 380]);
 set_param(dut+"/SpectrumGate", Criteria="u2 > Threshold", Threshold="0.5");
 
-add_line(dut, "MagnitudeSquared/1", "SpectrumSum/1", autorouting="on");
+add_line(dut, "MagNarrow/1", "SpectrumSum/1", autorouting="on");
 add_line(dut, "SpectrumGate/1", "SpectrumSum/2", autorouting="on");
 add_line(dut, "SpectrumSum/1", "SpectrumDelay/1", autorouting="on");
 add_line(dut, "FFT_N/2", "SpectrumDelay/2", autorouting="on");
@@ -568,7 +579,11 @@ add_block("simulink/Math Operations/MinMax", dut+"/GuardedSum", ...
     Position=[1740 400 1790 460]);
 set_param(dut+"/GuardedSum", Function="max", Inputs="3");
 add_line(dut, "SpectrumSum/1", "GuardedSum/1", autorouting="on");
-add_line(dut, "PeakTracker/2", "GuardedSum/2", autorouting="on");
+add_block("simulink/Signal Attributes/Data Type Conversion", ...
+    dut+"/PeakNarrow", Position=[1690 200 1730 230]);
+applyType(dut+"/PeakNarrow", isFixed, types, "magnitudeSquared", "double");
+add_line(dut, "PeakTracker/2", "PeakNarrow/1", autorouting="on");
+add_line(dut, "PeakNarrow/1", "GuardedSum/2", autorouting="on");
 add_line(dut, "SumFloor/1", "GuardedSum/3", autorouting="on");
 
 add_block("simulink/Math Operations/Divide", dut+"/Confidence", ...
@@ -579,7 +594,7 @@ set_param(dut+"/Confidence", Inputs="*/");
 % toward zero is identical to the Floor used everywhere else.
 applyType(dut+"/Confidence", isFixed, types, "confidence", ...
     "Inherit: Inherit via internal rule", "Zero");
-add_line(dut, "PeakTracker/2", "Confidence/1", autorouting="on");
+add_line(dut, "PeakNarrow/1", "Confidence/1", autorouting="on");
 add_line(dut, "GuardedSum/1", "Confidence/2", autorouting="on");
 
 % --- timestamp metadata ----------------------------------------------------

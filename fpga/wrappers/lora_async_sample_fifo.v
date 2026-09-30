@@ -27,7 +27,13 @@ module lora_async_sample_fifo #(
     input  wire                   rd_clk,
     input  wire                   rd_resetn,
     output reg                    rd_valid,
-    output reg  [WIDTH-1:0]       rd_data
+    output reg  [WIDTH-1:0]       rd_data,
+    // Number of samples dropped at a full FIFO since wr_resetn, saturating,
+    // seen from the read domain. wr_overflow says "at least once since boot",
+    // which on the board was set on every capture of the M7 series and so
+    // could not say whether a given packet lost samples; a count read before
+    // and after each attempt can.
+    output reg  [15:0]            rd_drop_count
 );
 
     localparam integer DEPTH = (1 << ADDR_WIDTH);
@@ -64,6 +70,25 @@ module lora_async_sample_fifo #(
         end
     endfunction
 
+    // The drop count crosses as Gray code for the same reason the pointers
+    // do: it advances by at most one per write clock, so the synchronized
+    // value is always one the counter actually held.
+    reg [15:0] drop_bin;
+    reg [15:0] drop_gray;
+    (* ASYNC_REG = "TRUE" *) reg [15:0] drop_gray_meta;
+    (* ASYNC_REG = "TRUE" *) reg [15:0] drop_gray_sync;
+    wire [15:0] drop_bin_next = drop_bin + 16'd1;
+
+    function [15:0] gray16_to_bin;
+        input [15:0] g;
+        integer k;
+        begin
+            gray16_to_bin[15] = g[15];
+            for (k = 14; k >= 0; k = k - 1)
+                gray16_to_bin[k] = gray16_to_bin[k + 1] ^ g[k];
+        end
+    endfunction
+
     wire [ADDR_WIDTH:0] wr_bin_next = wr_bin + {{ADDR_WIDTH{1'b0}}, 1'b1};
     wire [ADDR_WIDTH:0] wr_gray_next = bin_to_gray(wr_bin_next);
     wire full = (wr_gray_next == {~rd_gray_sync[ADDR_WIDTH:ADDR_WIDTH-1],
@@ -78,6 +103,8 @@ module lora_async_sample_fifo #(
             wr_bin       <= {(ADDR_WIDTH+1){1'b0}};
             wr_gray      <= {(ADDR_WIDTH+1){1'b0}};
             wr_overflow  <= 1'b0;
+            drop_bin     <= 16'd0;
+            drop_gray    <= 16'd0;
             rd_gray_meta <= {(ADDR_WIDTH+1){1'b0}};
             rd_gray_sync <= {(ADDR_WIDTH+1){1'b0}};
             rd_resetn_meta <= 1'b0;
@@ -93,6 +120,10 @@ module lora_async_sample_fifo #(
                     // count downstream, so the fact has to survive to a
                     // register read rather than being a one-cycle pulse.
                     wr_overflow <= 1'b1;
+                    if (!(&drop_bin)) begin
+                        drop_bin  <= drop_bin_next;
+                        drop_gray <= drop_bin_next ^ (drop_bin_next >> 1);
+                    end
                 end else begin
                     mem[wr_bin[ADDR_WIDTH-1:0]] <= wr_data;
                     wr_bin  <= wr_bin_next;
@@ -110,9 +141,15 @@ module lora_async_sample_fifo #(
             rd_data      <= {WIDTH{1'b0}};
             wr_gray_meta <= {(ADDR_WIDTH+1){1'b0}};
             wr_gray_sync <= {(ADDR_WIDTH+1){1'b0}};
+            drop_gray_meta <= 16'd0;
+            drop_gray_sync <= 16'd0;
+            rd_drop_count  <= 16'd0;
         end else begin
             wr_gray_meta <= wr_gray;
             wr_gray_sync <= wr_gray_meta;
+            drop_gray_meta <= drop_gray;
+            drop_gray_sync <= drop_gray_meta;
+            rd_drop_count  <= gray16_to_bin(drop_gray_sync);
             rd_valid <= 1'b0;
             if (!empty) begin
                 rd_data  <= mem[rd_bin[ADDR_WIDTH-1:0]];

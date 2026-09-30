@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tools.summarize_capture_run import summarize
+from tools.summarize_capture_run import drop_increments, summarize
 
 
 def _ok(crc: bool = True, straddle: bool = False, precise: bool = True) -> dict:
@@ -80,3 +80,59 @@ def test_an_empty_run_does_not_divide_by_zero() -> None:
     assert summary["attempts"] == 0
     assert summary["crc_valid"] == "0/0"
     assert summary["straddle_accepted_crc_valid"] == "0/0"
+
+
+def test_crossing_drops_are_attributed_to_the_attempt_that_saw_them() -> None:
+    def with_count(record: dict, name: str, count: int) -> dict:
+        record["_file"] = name
+        if record.get("status") == "failed":
+            record["pl_state"] = {"crossing_drop_count": count}
+        else:
+            record["receiver_clock"] = {"crossing_drop_count": count}
+        return record
+
+    records = [
+        with_count(_ok(), "a", 3),
+        with_count(_ok(), "b", 3),
+        with_count(_failed("read_trace", burst=9000.0), "c", 11),
+        with_count(_ok(), "d", 11),
+    ]
+
+    assert drop_increments(records) == [("b", "c", 8)]
+    assert summarize(records)["crossing_drop_increments"] == ["c: +8"]
+
+
+def test_an_image_without_the_drop_count_says_so() -> None:
+    assert summarize([_ok(), _ok()])["crossing_drop_increments"].startswith("n/a")
+
+
+def test_planned_attempts_count_missing_records() -> None:
+    summary = summarize([_ok(), _failed("send")], planned_attempts=5)
+
+    assert summary["missing_records"] == 3
+    assert summary["accounting_complete"] is False
+
+
+def test_a_complete_campaign_is_complete() -> None:
+    summary = summarize([_ok(), _failed("send")], planned_attempts=2)
+
+    assert summary["missing_records"] == 0
+    assert summary["accounting_complete"] is True
+
+
+def test_a_success_record_without_a_decode_verdict_is_not_a_capture() -> None:
+    bare = {"schema": "zynq-lora-clg400-symbol-trace-v1", "entries": []}
+
+    summary = summarize([_ok(), bare], planned_attempts=2)
+
+    assert summary["captured"] == 1
+    assert summary["unclassified_records"] == 1
+    assert summary["accounting_complete"] is False
+
+
+def test_more_records_than_planned_is_refused() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="more records"):
+        summarize([_ok(), _ok()], planned_attempts=1)
+

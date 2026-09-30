@@ -253,10 +253,25 @@ timing, and reports the same symbols as MATLAB/Simulink for the regression set.
   covered by `tb_lora_joint_grid_completion`, which now requires the guard
   back whatever the estimate does. A `search_abort_error` output makes the
   abort visible.
-- [ ] Find why the joint search fails at a non-zero arrival phase — a "fine correction applied"
-  flag beside `DEBUG` bit 8 and a sticky bit per abort reason — then rebuild
-  and repeat. `lora_joint_chirp_grid_controller` has three silent paths to
-  `STATE_IDLE`, and a frozen trace cannot currently tell them apart.
+- [x] Tell the joint search's silent outcomes apart (sticky up/down abort,
+  range rejection and "precise correction applied" bits) and find the grid
+  placement defect against ground truth. Sub-sample interpolation in the
+  joint estimator followed; at gain 25 dB every capture with zero grid error
+  decodes. See [the experiment log](clg400-joint-grid-experiment.md), steps M4-M5.
+- [x] Keep one absolute sample timebase across a capture series: `trace_rearm`
+  re-arms the symbol trace and grid resync without zeroing the counter;
+  confirmed on hardware over 803.7 s (experiment log, step M6).
+- [x] Close the detector's blind band at the preamble/sync boundary (about 7%
+  of arrival phases) with a straddle-tolerant path, guarded against silence.
+  On hardware: detection misses 12 of 196 (6.1%) before, 5 of 798 (0.63%)
+  after; all 46 packets accepted through the new path decode (experiment log,
+  step M7).
+- [ ] Explain the remaining detection misses (not reproducible by replaying the
+  recording through the RTL at any arrival phase) and the 1-sample grid errors
+  seen only in the first ~35 minutes after a cold boot (not a CFO effect in
+  the model or the RTL). A diagnostic image with a decision-history ring and a
+  receive-crossing drop count is built, not yet deployed (step M8).
+  Ordering: [qualification gates](qualification-gates.md).
 - [ ] Measure symbol error rate and PER over a controlled cable path.
 - [ ] Extend to the complete packet PHY and bidirectional interoperability.
 - [ ] Measure PER versus SNR/input power and CFO/SFO tolerance.

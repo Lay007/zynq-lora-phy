@@ -282,3 +282,24 @@ def test_recorded_realigned_hardware_trace_decodes_without_a_grid_phase() -> Non
     ) + start_ms.to_bytes(4, "little") + bytes(
         (sequence + index - 12) & 0xFF for index in range(12, 32)
     )
+
+
+def test_trace_decoder_prefers_the_closest_crc_valid_hypothesis() -> None:
+    # PER bench, SF7 CR 4/6, SNR -9.5 dB (2026-09-30). The first hypothesis
+    # the search reaches (bin adjustment -2, offset 6) passes the 16-bit CRC
+    # with a 53-byte payload; the transmitted 32-byte packet decodes cleanly
+    # at adjustment 0, offset 2. Returning the first CRC success lost 55 of
+    # 5937 bench packets this way.
+    trace = (
+        "4d362141050d75196d11721b3936261c0c115a54757f7f342731080c69626f3d"
+        "726c5554552a061b437d1128211449634f33454d6b4e0127005e463b277d4629"
+        "0c067d446171014c093f367a1d75206f3873620325586f191d5a6b0c7e7b4475"
+        "217a5f4c15047915151a5b5d2719593f4e2053563d603f6509310f48410a6c7b"
+    )
+    raw = [int(trace[2 * k:2 * k + 2], 16) for k in range(len(trace) // 2)]
+
+    candidate = decode_lora_symbol_trace(raw, 0)
+
+    assert candidate.result.crc_valid
+    assert candidate.result.payload[:4] == b"ZLP1"
+    assert int.from_bytes(candidate.result.payload[4:8], "little") == 45

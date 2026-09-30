@@ -51,7 +51,7 @@ acquisition:
   raw_capture_sha256: null
 
 analysis:
-  estimator: "matched-filter-parabolic-v1"
+  estimator: "matched-filter-log-magnitude-v1"
   acceptance:
     maximum_bias_samples: null
     maximum_std_samples: null

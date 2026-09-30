@@ -5,3 +5,8 @@ captures/reference/**/*.cfile filter=lfs diff=lfs merge=lfs -text
 # Stage-level golden vectors are raw little-endian float64 payloads.
 # Any end-of-line conversion would silently corrupt them.
 *.f64 binary
+
+# Text golden vectors (ROM images, matched-filter stimulus) are hashed and
+# loaded by $readmemh as committed; with core.autocrlf a fresh Windows
+# checkout would otherwise turn them CRLF and change every hash.
+*.mem text eol=lf

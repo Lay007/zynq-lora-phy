@@ -23,6 +23,9 @@ module tb_lora_async_sample_fifo;
     wire wr_overflow;
     wire rd_valid;
     wire [WIDTH-1:0] rd_data;
+    wire [15:0] rd_drop_count;
+    integer phase2_reads = 0;
+    reg counting2 = 1'b0;
 
     integer errors = 0;
     integer written = 0;
@@ -42,7 +45,8 @@ module tb_lora_async_sample_fifo;
         .rd_clk(rd_clk),
         .rd_resetn(rd_resetn),
         .rd_valid(rd_valid),
-        .rd_data(rd_data)
+        .rd_data(rd_data),
+        .rd_drop_count(rd_drop_count)
     );
 
     // The board ratio: one sample clock per 62.5 receiver clocks. Deliberately
@@ -54,6 +58,10 @@ module tb_lora_async_sample_fifo;
 
     always #(wr_half) wr_clk = ~wr_clk;
     always #(RD_HALF) rd_clk = ~rd_clk;
+
+    always @(posedge rd_clk)
+        if (rd_resetn && rd_valid && counting2)
+            phase2_reads = phase2_reads + 1;
 
     always @(posedge rd_clk) begin
         if (rd_resetn && rd_valid && checking) begin
@@ -119,6 +127,10 @@ module tb_lora_async_sample_fifo;
             errors = errors + 1;
             $display("FAIL slow writer reported overflow");
         end
+        if (rd_drop_count !== 16'd0) begin
+            errors = errors + 1;
+            $display("FAIL slow writer: drop count %0d, expected 0", rd_drop_count);
+        end
         if (errors == 0)
             $display("PASS slow writer: %0d samples crossed in order", read_back);
 
@@ -126,6 +138,7 @@ module tb_lora_async_sample_fifo;
         // samples without a trace; once full, the checker is retired because
         // the sequence is legitimately broken.
         checking <= 1'b0;
+        counting2 <= 1'b1;
         wr_half = 3.0;
         @(negedge wr_clk);
         wr_valid <= 1'b1;
@@ -141,6 +154,16 @@ module tb_lora_async_sample_fifo;
             $display("FAIL writer outran reader without reporting overflow");
         end else begin
             $display("PASS overflow reported when the writer outruns the reader");
+        end
+        // Every sample written in the burst either crossed or was counted
+        // as dropped: the count is exact, not merely non-zero.
+        repeat (20) @(posedge rd_clk);
+        if (rd_drop_count == 16'd0 || rd_drop_count != 64 - phase2_reads) begin
+            errors = errors + 1;
+            $display("FAIL drop count %0d, expected %0d (64 written, %0d read)",
+                     rd_drop_count, 64 - phase2_reads, phase2_reads);
+        end else begin
+            $display("PASS drop count %0d = 64 written - %0d crossed", rd_drop_count, phase2_reads);
         end
 
         if (errors == 0)

@@ -40,6 +40,17 @@ directly from the checkpoint:
   -source fpga\\board\\clg400\\report_board_checkpoint.tcl
 ```
 
+If instead the launcher hangs after synthesis *without* writing
+`system_top.dcp` (the synthesis log ends with `0 Errors`, `impl_1` is never
+created, `vivado.exe` processes sit idle; seen on the M6 and first M7 builds),
+the checkpoint path above cannot help. Stop the hung `vivado.exe` processes,
+reset the stale run, and run `build_bitstream.tcl` again:
+
+```powershell
+& G:\Xilinx\Vivado\2021.1\bin\vivado.bat -mode batch -nojournal -nolog `
+  -source fpga\board\clg400\reset_stale_synth_run.tcl
+```
+
 Build implementation and bitstream only after project creation succeeds:
 
 ```powershell

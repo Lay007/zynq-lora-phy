@@ -63,7 +63,7 @@ receivers:
 
 analysis:
   event_association_key: "payload-sequence-id"
-  toa_estimator: "matched-filter-parabolic-v1"
+  toa_estimator: "matched-filter-log-magnitude-v1"
   solver: "gauss-newton-v1"
   propagation_speed_m_s: 299792458.0
   acceptance:
