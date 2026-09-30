@@ -163,7 +163,8 @@ end
 names = [ ...
     "symbolIndex"; "symbolValid"; "confidence"; "peakMagnitudeSquared"; ...
     "spectrumSum"; "symbolBoundary"; ...
-    "symbolSampleCount"; "timestampValid"];
+    "symbolSampleCount"; "timestampValid"; ...
+    "binPower"; "binIndex"; "binValid"];
 if includeTaps
     names = [names; ...
         "stageFftM"; "stageProduct"; "stagePartition"; "stageFftN"; ...
@@ -646,17 +647,24 @@ addOutport(dut, "spectrumSum", 5, [1990 260], "SpectrumSum/1");
 addOutport(dut, "symbolBoundary", 6, [1990 310], "InputFraming/1");
 addOutport(dut, "symbolSampleCount", 7, [1990 360], "TimestampFifo/1");
 addOutport(dut, "timestampValid", 8, [1990 410], "TimestampFifo/2");
+% The per-bin power stream the peak search sees (#36): |X|^2 at magnitudeWide,
+% its bin within the symbol, and its valid -- the same three signals as the
+% PeakTracker's inputs, so delay balancing keeps them aligned with each other.
+% A preamble detector outside the core accumulates it over several windows.
+addOutport(dut, "binPower", 9, [1990 440], "MagnitudeSquared/1");
+addOutport(dut, "binIndex", 10, [1990 460], "OutputBinCounter/1");
+addOutport(dut, "binValid", 11, [1990 470], "FFT_N/2");
 
 if includeTaps
-    addOutport(dut, "stageFftM", 9, [1990 480], "FFT_M/1");
-    addOutport(dut, "stageProduct", 10, [1990 530], "Multiply/1");
-    addOutport(dut, "stagePartition", 11, [1990 580], "AccumSum/1");
-    addOutport(dut, "stageFftN", 12, [1990 630], "ScaleByM/1");
-    addOutport(dut, "stageMagnitudeSquared", 13, [1990 680], ...
+    addOutport(dut, "stageFftM", 12, [1990 480], "FFT_M/1");
+    addOutport(dut, "stageProduct", 13, [1990 530], "Multiply/1");
+    addOutport(dut, "stagePartition", 14, [1990 580], "AccumSum/1");
+    addOutport(dut, "stageFftN", 15, [1990 630], "ScaleByM/1");
+    addOutport(dut, "stageMagnitudeSquared", 16, [1990 680], ...
         "MagnitudeSquared/1");
-    addOutport(dut, "fftMValid", 14, [1990 730], "FFT_M/2");
-    addOutport(dut, "partitionValid", 15, [1990 780], "BinCounter/3");
-    addOutport(dut, "fftNValid", 16, [1990 830], "FFT_N/2");
+    addOutport(dut, "fftMValid", 17, [1990 730], "FFT_M/2");
+    addOutport(dut, "partitionValid", 18, [1990 780], "BinCounter/3");
+    addOutport(dut, "fftNValid", 19, [1990 830], "FFT_N/2");
 end
 
 set_param(dut, TreatAsAtomicUnit="on");

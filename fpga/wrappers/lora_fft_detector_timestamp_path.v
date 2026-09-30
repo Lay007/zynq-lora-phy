@@ -23,6 +23,9 @@ module lora_fft_detector_timestamp_path (
     input  wire               cfo_load,
     input  wire signed [31:0] cfo_q12,
     input  wire               cfo_clear,
+    // Re-arms the accumulating preamble detector without a stream reset
+    // (the capture path's trace re-arm), like lora_symbol_grid_resync.
+    input  wire               accum_rearm,
 
     output wire [31:0]        symbol_index,
     output wire               symbol_valid,
@@ -34,6 +37,12 @@ module lora_fft_detector_timestamp_path (
     output wire               straddle_detected,
     output wire               split_detected,
     output wire               early_sync_detected,
+    // High in the same cycle as `detected` when only the accumulated-preamble
+    // path (#36) accepted the packet; accum_triggered pulses when the
+    // accumulator fired and shifted the grid (a diagnostic: it also fires on
+    // packets that another path then detects, and ~once per 17 min on noise).
+    output wire               accum_detected,
+    output wire               accum_triggered,
     output wire               preamble_detected,
     output wire               sync_valid,
     output wire [15:0]        preamble_bin,
@@ -62,14 +71,27 @@ module lora_fft_detector_timestamp_path (
     wire               rot_resync_valid;
     wire [31:0]        rot_resync_skip;
 
+    // Accumulating preamble detector (#36). Its grid shift joins the caller's
+    // resync request ahead of the derotator, so it travels with the samples
+    // exactly as that one does; the caller's request (the payload realignment
+    // and the fine correction) wins if both are ever raised together.
+    wire [39:0]  bin_power;
+    wire [31:0]  bin_index;
+    wire         bin_valid;
+    wire         accum_request;
+    wire [31:0]  accum_skip;
+    wire         accum_aligned;
+    wire         merged_resync_valid = resync_valid || accum_request;
+    wire [31:0]  merged_resync_skip = resync_valid ? resync_skip : accum_skip;
+
     lora_cfo_derotator u_cfo_derotator (
         .clk(clk),
         .resetn(resetn),
         .in_re(iq_in_re),
         .in_im(iq_in_im),
         .in_valid(valid_in),
-        .in_resync_valid(resync_valid),
-        .in_resync_skip(resync_skip),
+        .in_resync_valid(merged_resync_valid),
+        .in_resync_skip(merged_resync_skip),
         .in_stream_reset(reset_in),
         .load(cfo_load),
         .cfo_q12(cfo_q12),
@@ -100,7 +122,29 @@ module lora_fft_detector_timestamp_path (
         .spectrumSum(spectrum_sum),
         .symbolBoundary(symbol_boundary),
         .symbolSampleCount(symbol_sample_count),
-        .timestampValid(timestamp_valid)
+        .timestampValid(timestamp_valid),
+        .binPower(bin_power),
+        .binIndex(bin_index),
+        .binValid(bin_valid)
+    );
+
+    lora_preamble_accumulator u_preamble_accumulator (
+        .clk(clk),
+        .resetn(resetn),
+        .stream_reset(reset_in || accum_rearm),
+        .enable(1'b1),
+        .sample_valid(valid_in),
+        .packet_detected(detected),
+        .bin_power(bin_power),
+        .bin_index(bin_index),
+        .bin_valid(bin_valid),
+        .window_done(symbol_valid),
+        .resync_request(accum_request),
+        .resync_skip(accum_skip),
+        .aligned(accum_aligned),
+        .trigger_bin(),
+        .trigger_fraction(),
+        .triggered(accum_triggered)
     );
 
     // symbol_valid is the actual transaction qualifier. Keeping the generated
@@ -117,10 +161,12 @@ module lora_fft_detector_timestamp_path (
         .timestamp_valid(timestamp_valid),
         .symbol_peak(peak_magnitude_squared),
         .sync_word(sync_word),
+        .accum_aligned(accum_aligned),
         .detected(detected),
         .straddle_detected(straddle_detected),
         .split_detected(split_detected),
         .early_sync_detected(early_sync_detected),
+        .accum_detected(accum_detected),
         .preamble_detected(preamble_detected),
         .sync_valid(sync_valid),
         .preamble_bin(preamble_bin),

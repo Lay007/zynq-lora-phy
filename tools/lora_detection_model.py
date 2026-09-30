@@ -73,7 +73,26 @@ def preamble8(sym: np.ndarray) -> bool:
     return any(all(within(sym[j], sym[i - 8]) for j in range(i - 8, i)) for i in range(8, len(sym) + 1))
 
 
-def accumulated_live(x: np.ndarray, k_windows: int, threshold: float) -> bool:
+FRAC_MODE = "amp"
+
+
+def fractional_chip(p3: np.ndarray, mode: str) -> float:
+    """Sub-chip offset of the accumulated peak from its two neighbours: 'amp' parabola on
+    amplitudes (needs square roots), 'pow' parabola on powers (hardware-cheap), 'none'."""
+    if mode == "none":
+        return 0.0
+    v = np.sqrt(p3) if mode == "amp" else p3.astype(float)
+    den = v[0] - 2 * v[1] + v[2]
+    return float(np.clip(0.5 * (v[0] - v[2]) / den, -0.5, 0.5)) if den else 0.0
+
+
+def accumulated_live(x: np.ndarray, k_windows: int, threshold: float, sync1_sample: int | None = None,
+                     require_preamble: bool = False) -> str:
+    """'ok' when the sync pair is accepted on the true sync windows, 'wrong' when a pair of noise or
+    payload decisions is accepted elsewhere first (a detection with the wrong timing, the packet
+    is lost), 'miss' otherwise. require_preamble adds the window before the pair: it must read the
+    preamble (ref +-1). Windows are scanned in time order, all three references per window, as the
+    RTL does."""
     sym, mag = windows(x)
     for i in range(k_windows, len(mag) + 1):
         acc = mag[i - k_windows:i].sum(0)
@@ -81,30 +100,35 @@ def accumulated_live(x: np.ndarray, k_windows: int, threshold: float) -> bool:
         if pk / ((acc.sum() - pk) / (N - 1)) <= threshold:
             continue
         k = int(acc.argmax())
-        a_m, a_0, a_p = np.sqrt(acc[[(k - 1) % N, k, (k + 1) % N]])
-        den = a_m - 2 * a_0 + a_p
-        frac = 0.5 * (a_m - a_p) / den if den else 0.0
+        frac = fractional_chip(acc[[(k - 1) % N, k, (k + 1) % N]], FRAC_MODE)
         shift = int(round((k + frac) * CFG.samples_per_chip))
         start = i * M + (M - shift) % M
         asym, _ = windows(x[start:])
-        for ref in (0, 1, N - 1):
-            # a strong preamble triggers after only a few of its 12 symbols: up to ~11 more
-            # preamble windows may come before the sync pair, so the scan covers 18 windows
-            for j in range(min(len(asym) - 1, 18)):
-                if within(asym[j], ref + HI) and within(asym[j + 1], ref + LO):
-                    return True
-        return False
-    return False
+        # a strong preamble triggers after only a few of its 12 symbols: up to ~11 more preamble
+        # windows may come before the sync pair, so the scan covers 18 windows
+        for j in range(min(len(asym) - 1, 18)):
+            for ref in (0, 1, N - 1):
+                pre_ok = (not require_preamble) or (j > 0 and within(asym[j - 1], ref))
+                if pre_ok and within(asym[j], ref + HI) and within(asym[j + 1], ref + LO):
+                    if sync1_sample is None:
+                        return "ok"
+                    true_j = int(round((sync1_sample - start) / M))
+                    return "ok" if j == true_j else "wrong"
+        return "miss"
+    return "miss"
 
 
-def trial(rng: np.random.Generator, snr_db: float) -> np.ndarray:
+def trial(rng: np.random.Generator, snr_db: float) -> tuple[np.ndarray, int]:
+    """The noisy stream and the sample where the first sync symbol starts."""
     w = packet_waveform(test_payload(int(rng.integers(64))), 7, 125e3, 1, 1e6)
     phase = int(rng.integers(0, M))
     total = 30 * M
     x = np.zeros(total, complex)
-    x[4 * M + phase:] = w[: total - 4 * M - phase]
+    s0 = 4 * M + phase
+    x[s0:] = w[: total - s0]
     sigma = math.sqrt(10 ** (-snr_db / 10) / 125e3 * 1e6 / 2)
-    return x + sigma * (rng.standard_normal(total) + 1j * rng.standard_normal(total))
+    x = x + sigma * (rng.standard_normal(total) + 1j * rng.standard_normal(total))
+    return x, s0 + 12 * M  # preamble of 12 upchirps (lora_tx_waveform.PREAMBLE)
 
 
 def main() -> int:
@@ -114,18 +138,29 @@ def main() -> int:
     ap.add_argument("--k", type=int, default=8)
     ap.add_argument("--p-fa", type=float, default=1e-6)
     ap.add_argument("--seed", type=int, default=3)
+    ap.add_argument("--frac", choices=["amp", "pow", "none"], default="amp")
     args = ap.parse_args()
+    global FRAC_MODE
+    FRAC_MODE = args.frac
     t = accumulation_threshold(args.k, args.p_fa)
     print(f"K={args.k}, P_fa {args.p_fa:g}/window: threshold {t:.2f} x mean bin power")
     rng = np.random.default_rng(args.seed)
     for snr in args.snr:
-        miss = np.zeros(2)
+        counts = {"pre8": 0, "ok": 0, "wrong": 0, "ok_p": 0, "wrong_p": 0}
         for _ in range(args.trials):
-            x = trial(rng, snr)
+            x, sync1 = trial(rng, snr)
             sym, _ = windows(x)
-            miss += [not preamble8(sym), not accumulated_live(x, args.k, t)]
-        print(f"SNR {snr:+.1f} dB: missed, preamble8 {miss[0] / args.trials:.3f}, "
-              f"accumulated + live resync {miss[1] / args.trials:.3f}", flush=True)
+            counts["pre8"] += not preamble8(sym)
+            r = accumulated_live(x, args.k, t, sync1)
+            counts["ok"] += r == "ok"
+            counts["wrong"] += r == "wrong"
+            r = accumulated_live(x, args.k, t, sync1, require_preamble=True)
+            counts["ok_p"] += r == "ok"
+            counts["wrong_p"] += r == "wrong"
+        n = args.trials
+        print(f"SNR {snr:+.1f} dB: missed, preamble8 {counts['pre8'] / n:.3f}; accumulated + live resync "
+              f"{1 - counts['ok'] / n:.3f} (wrong timing {counts['wrong'] / n:.3f}); with the preamble window "
+              f"{1 - counts['ok_p'] / n:.3f} (wrong timing {counts['wrong_p'] / n:.3f})", flush=True)
     return 0
 
 

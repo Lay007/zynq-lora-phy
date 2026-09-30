@@ -10,7 +10,8 @@
 // met the SFD deadline".
 //
 // Output lines: SYM <bin> <window origin>, PRE <bin> <chips> n=<sample>,
-// SYN n=<sample>, DET <bin> <chips> n=<sample> straddle=<0|1> split=<0|1> early=<0|1>, META <coarse> <frac_q12>, PSC <packet_start_count>
+// SYN n=<sample>, DET <bin> <chips> n=<sample> straddle=<0|1> split=<0|1> early=<0|1> accum=<0|1>,
+// ACC bin=<k> q=<step> skip=<samples> n=<sample> (the accumulator fired, #36), META <coarse> <frac_q12>, PSC <packet_start_count>
 // n=<sample>, JNT <joint controller result>, DONE.
 //
 // Compile from the repo root (the reference ROM path is relative) with the
@@ -232,11 +233,19 @@ module tb_replay_detect;
                 $display("DET %0d %0d n=%0d straddle=%0d split=0 early=0", dut.preamble_bin, dut.chips_to_boundary,
                          sample_cnt, dut.packet_straddle_detected);
 `else
-                $display("DET %0d %0d n=%0d straddle=%0d split=%0d early=%0d", dut.preamble_bin, dut.chips_to_boundary,
+                $display("DET %0d %0d n=%0d straddle=%0d split=%0d early=%0d accum=%0d", dut.preamble_bin, dut.chips_to_boundary,
                          sample_cnt, dut.packet_straddle_detected, dut.packet_split_detected,
-                         dut.packet_early_sync_detected);
+                         dut.packet_early_sync_detected, dut.packet_accum_detected);
 `endif
             end
+`ifndef REPLAY_NO_SPLIT
+            // The accumulating preamble detector fired and shifted the grid (#36).
+            if (dut.accum_triggered)
+                $display("ACC bin=%0d q=%0d skip=%0d n=%0d",
+                         dut.u_fft_detector_timestamp.u_preamble_accumulator.trigger_bin,
+                         $signed(dut.u_fft_detector_timestamp.u_preamble_accumulator.trigger_fraction),
+                         dut.u_fft_detector_timestamp.u_preamble_accumulator.resync_skip, sample_cnt);
+`endif
         end
     end
 

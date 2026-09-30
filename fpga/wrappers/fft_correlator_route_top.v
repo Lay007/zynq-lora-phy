@@ -18,6 +18,10 @@
 // the top 20 of the 40 bits, so 'peak != 0' keeps meaning exactly what the
 // detector's straddle guard was tuned on; only the argmax gained the bits.
 //
+// Since #36 the core also streams every bin's |X|^2 (binPower, ufix40_En19),
+// its bin (binIndex) and valid (binValid): the input of the accumulating
+// preamble detector (lora_preamble_accumulator). Registered like the rest.
+//
 // The generated DUT is kept untouched. Registering every functional input
 // and output closes its external combinational paths so post-route timing is
 // measured register-to-register. clk_enable is tied high because the
@@ -55,7 +59,10 @@ module fft_correlator_route_top
            spectrumSum,
            symbolBoundary,
            symbolSampleCount,
-           timestampValid);
+           timestampValid,
+           binPower,
+           binIndex,
+           binValid);
 
   input clk;
   input reset;
@@ -74,6 +81,9 @@ module fft_correlator_route_top
   output reg symbolBoundary;
   output reg [63:0] symbolSampleCount;
   output reg timestampValid;
+  output reg [39:0] binPower;
+  output reg [31:0] binIndex;
+  output reg binValid;
 
   reg signed [19:0] iqIn_re_reg;
   reg signed [19:0] iqIn_im_reg;
@@ -92,6 +102,9 @@ module fft_correlator_route_top
   wire dut_symbolBoundary;
   wire [63:0] dut_symbolSampleCount;
   wire dut_timestampValid;
+  wire [39:0] dut_binPower;
+  wire [31:0] dut_binIndex;
+  wire dut_binValid;
 
   `LORA_FFT_GENERATED_DUT u_dut
         (.clk(clk),
@@ -115,7 +128,10 @@ module fft_correlator_route_top
          .spectrumSum(dut_spectrumSum),
          .symbolBoundary(dut_symbolBoundary),
          .symbolSampleCount(dut_symbolSampleCount),
-         .timestampValid(dut_timestampValid));
+         .timestampValid(dut_timestampValid),
+         .binPower(dut_binPower),
+         .binIndex(dut_binIndex),
+         .binValid(dut_binValid));
 
   always @(posedge clk or posedge reset) begin
     if (reset) begin
@@ -134,6 +150,9 @@ module fft_correlator_route_top
       symbolBoundary <= 1'b0;
       symbolSampleCount <= 64'd0;
       timestampValid <= 1'b0;
+      binPower <= 40'd0;
+      binIndex <= 32'd0;
+      binValid <= 1'b0;
     end
     else begin
       iqIn_re_reg <= {iqIn_re, 4'b0000};
@@ -152,6 +171,9 @@ module fft_correlator_route_top
       symbolBoundary <= dut_symbolBoundary;
       symbolSampleCount <= dut_symbolSampleCount;
       timestampValid <= dut_timestampValid;
+      binPower <= dut_binPower;
+      binIndex <= dut_binIndex;
+      binValid <= dut_binValid;
     end
   end
 endmodule

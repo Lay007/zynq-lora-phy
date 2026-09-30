@@ -87,6 +87,11 @@ module lora_packet_toa_receiver_top #(
     // ... or only through its early-sync path (the tie window at half a
     // symbol read as the first sync symbol).
     output wire               packet_early_sync_detected,
+    // High in the same cycle as `detected` when only the accumulated-preamble
+    // path accepted the packet (#36); accum_triggered pulses whenever the
+    // accumulator fired and shifted the grid.
+    output wire               packet_accum_detected,
+    output wire               accum_triggered,
     output wire               preamble_detected,
     output wire               sync_valid,
     output wire [15:0]        preamble_bin,
@@ -233,6 +238,9 @@ module lora_packet_toa_receiver_top #(
         .cfo_load(joint_grid_precise_correction_applied),
         .cfo_q12(joint_cfo_q12),
         .cfo_clear(detected || reset_in || trace_rearm_in),
+        .accum_rearm(trace_rearm_in),
+        .accum_detected(packet_accum_detected),
+        .accum_triggered(accum_triggered),
         .symbol_index(symbol_index),
         .symbol_valid(symbol_valid),
         .confidence(symbol_confidence),

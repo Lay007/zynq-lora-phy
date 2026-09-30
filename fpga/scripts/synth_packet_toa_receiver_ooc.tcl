@@ -23,6 +23,7 @@ set files [concat [glob -nocomplain -directory $fftDir *.v] [list \
     [file join $wrapperDir lora_detector_timestamp_align.v] \
     [file join $wrapperDir lora_detector_timestamp_path.v] \
     [file join $wrapperDir lora_fft_detector_timestamp_path.v] \
+    [file join $wrapperDir lora_preamble_accumulator.v] \
     [file join $wrapperDir lora_iq_history_buffer.v] \
     [file join $wrapperDir lora_reference_chirp_rom.v] \
     [file join $wrapperDir lora_matched_filter_mac.v] \

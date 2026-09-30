@@ -101,6 +101,14 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_align.v \
             fpga/tb/tb_lora_detector_timestamp_align.sv
           vvp /tmp/lora_detector_timestamp_align_tb
+      - name: Compile and run accumulating preamble detector testbench
+        run: |
+          iverilog -g2012 -Wall \
+            -o /tmp/lora_preamble_accumulator_tb \
+            fpga/wrappers/lora_preamble_accumulator.v \
+            fpga/tb/tb_lora_preamble_accumulator.sv
+          vvp /tmp/lora_preamble_accumulator_tb | tee /tmp/lora_preamble_accumulator.log
+          grep -q '^PASS: lora_preamble_accumulator' /tmp/lora_preamble_accumulator.log
       - name: Compile and run generated detector timestamp path testbench
         run: |
           iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED \
@@ -121,6 +129,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/tb/tb_lora_fft_detector_timestamp_path.sv
           vvp /tmp/lora_fft_detector_timestamp_path_tb
       - name: Compile and run IQ to AXI packet timestamp testbench
@@ -135,6 +144,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/wrappers/lora_peak_triplet_capture.v \
             fpga/wrappers/lora_timestamp_metadata_join.v \
             fpga/wrappers/lora_axi_lite_status.v \
@@ -153,6 +163,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
             fpga/wrappers/lora_matched_filter_mac.v \
@@ -220,6 +231,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
             fpga/wrappers/lora_matched_filter_mac.v \
@@ -294,6 +306,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
             fpga/wrappers/lora_matched_filter_mac.v \
@@ -343,6 +356,7 @@ jobs:
             fpga/wrappers/lora_detector_timestamp_path.v \
             fpga/wrappers/lora_cfo_derotator.v \
             fpga/wrappers/lora_fft_detector_timestamp_path.v \
+            fpga/wrappers/lora_preamble_accumulator.v \
             fpga/wrappers/lora_iq_history_buffer.v \
             fpga/wrappers/lora_reference_chirp_rom.v \
             fpga/wrappers/lora_matched_filter_mac.v \

@@ -20,7 +20,9 @@
 // corresponding aligned timestamp pulse. Higher-level acquisition logic may
 // decide which preamble candidate to retain/reject. No packet state machine is
 // hidden here.
-module lora_detector_timestamp_align (
+module lora_detector_timestamp_align #(
+    parameter integer SYMBOL_SAMPLES = 1024
+) (
     input  wire        clk,
     input  wire        resetn,
 
@@ -28,6 +30,11 @@ module lora_detector_timestamp_align (
     input  wire        symbol_timestamp_valid,
     input  wire        preamble_detected,
     input  wire        packet_detected,
+    // With packet_detected: the packet start is the current window's count
+    // minus nine symbols (the same position as history[1] on an unbroken
+    // grid), for a detection whose grid was shifted inside the last nine
+    // windows (lora_preamble_accumulator, #36). Tie low otherwise.
+    input  wire        packet_start_from_current,
 
     output reg  [63:0] preamble_start_count,
     output reg         preamble_start_valid,
@@ -73,7 +80,10 @@ module lora_detector_timestamp_align (
                     preamble_start_valid <= 1'b1;
                 end
 
-                if (packet_detected && (filled >= 4'd9)) begin
+                if (packet_detected && packet_start_from_current) begin
+                    packet_start_count <= symbol_sample_count - SYMBOL_SAMPLES * 9;
+                    packet_start_valid <= 1'b1;
+                end else if (packet_detected && (filled >= 4'd9)) begin
                     packet_start_count <= history[1];
                     packet_start_valid <= 1'b1;
                 end

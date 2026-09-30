@@ -26,6 +26,7 @@ module tb_lora_detector_timestamp_align;
         .symbol_timestamp_valid(symbol_timestamp_valid),
         .preamble_detected(preamble_detected),
         .packet_detected(packet_detected),
+        .packet_start_from_current(1'b0),
         .preamble_start_count(preamble_start_count),
         .preamble_start_valid(preamble_start_valid),
         .packet_start_count(packet_start_count),

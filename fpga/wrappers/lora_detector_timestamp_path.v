@@ -30,6 +30,9 @@ module lora_detector_timestamp_path (
     // cycle. Zero exactly when there is no signal (see the straddle guard).
     input  wire [15:0] symbol_peak,
     input  wire [7:0]  sync_word,
+    // High while lora_preamble_accumulator has shifted the grid onto an
+    // accumulated preamble and waits for its sync word (#36).
+    input  wire        accum_aligned,
 
     output wire         detected,
     // High in the same cycle as `detected` when only the straddle-tolerant
@@ -41,6 +44,9 @@ module lora_detector_timestamp_path (
     // High in the same cycle as `detected` when only the early-sync path
     // (see below) accepted the packet.
     output wire         early_sync_detected,
+    // High in the same cycle as `detected` when only the accumulated-preamble
+    // path (see below) accepted the packet.
+    output wire         accum_detected,
     output wire         preamble_detected,
     output wire         sync_valid,
     output wire [15:0]  preamble_bin,
@@ -280,14 +286,49 @@ module lora_detector_timestamp_path (
         !detected_straddle && !detected_split;
     wire [15:0] early_chips = ((BIN_MASK + 16'd1) - alt_ref) & BIN_MASK;
 
-    assign detected = detected_generated || detected_straddle || detected_split || detected_early;
+    // Accumulated-preamble acceptance (#36).
+    //
+    // lora_preamble_accumulator sums every bin's |X|^2 over eight windows,
+    // declares a preamble when the summed peak stands out, and shifts the
+    // grid onto that preamble's symbol boundaries. From then on (accum_aligned)
+    // the preamble reads bin 0 or +-1 -- the sub-chip rest of the shift -- and
+    // the sync word is read on whole symbols: two consecutive decisions at
+    // ref + 8*highNibble and ref + 8*lowNibble (+-1), ref in {0, 1, N-1}.
+    // No preamble run is required here: the accumulator has already decided
+    // there is one, and needing eight equal decisions is exactly what lost
+    // weak packets (float model, tools/lora_detection_model.py: missed 0.12 /
+    // 0.04 at -10 / -9 dB against 0.41 / 0.17; no detection at a wrong
+    // position in 1200 trials, since the windows before the sync read the
+    // preamble, not random bins). The preamble bin reported is ref and
+    // chips_to_boundary is N - ref, so the payload realignment and the joint
+    // controller see an ordinary packet at grid phase ~0.
+    wire [15:0] acc_hi = (alt_high << 3) & BIN_MASK;
+    wire [15:0] acc_lo = (alt_low << 3) & BIN_MASK;
+    wire acc_m0 = bin_within(prev_bin[8], acc_hi) &&
+                  bin_within(detector_symbol_index, acc_lo);
+    wire acc_m1 = bin_within(prev_bin[8], (acc_hi + 16'd1) & BIN_MASK) &&
+                  bin_within(detector_symbol_index, (acc_lo + 16'd1) & BIN_MASK);
+    wire acc_mn = bin_within(prev_bin[8], (acc_hi + BIN_MASK) & BIN_MASK) &&
+                  bin_within(detector_symbol_index, (acc_lo + BIN_MASK) & BIN_MASK);
+    wire detected_accum_raw = alt_step && accum_aligned && (prev_filled != 4'd0) &&
+                              (acc_m0 || acc_m1 || acc_mn);
+    wire detected_accum = detected_accum_raw && !detected_generated &&
+                          !detected_straddle && !detected_split && !detected_early;
+    wire [15:0] accum_ref = acc_m0 ? 16'd0 : (acc_m1 ? 16'd1 : BIN_MASK);
+    wire [15:0] accum_chips = ((BIN_MASK + 16'd1) - accum_ref) & BIN_MASK;
+
+    assign detected = detected_generated || detected_straddle || detected_split ||
+                      detected_early || detected_accum;
+    assign accum_detected = detected_accum;
     assign straddle_detected = (detected_straddle && !detected_generated) || split_straddle_form;
     assign split_detected = detected_split;
     assign early_sync_detected = detected_early;
     assign preamble_bin = detected_split ? split_bin :
-                          detected_early ? alt_ref : generated_preamble_bin;
+                          detected_early ? alt_ref :
+                          detected_accum ? accum_ref : generated_preamble_bin;
     assign chips_to_boundary = detected_split ? split_chips :
-                               detected_early ? early_chips : generated_chips_to_boundary;
+                               detected_early ? early_chips :
+                               detected_accum ? accum_chips : generated_chips_to_boundary;
 
     always @(posedge clk) begin
         if (!resetn || reset_in) begin
@@ -317,6 +358,10 @@ module lora_detector_timestamp_path (
         .symbol_timestamp_valid(timestamp_valid),
         .preamble_detected(preamble_detected),
         .packet_detected(detected),  // generated OR straddle-tolerant
+        // The accumulated path's grid moved within the last few windows, so
+        // the window nine symbols back is not 9*M samples back: take the
+        // packet start from the current window instead.
+        .packet_start_from_current(detected_accum),
         .preamble_start_count(preamble_start_count),
         .preamble_start_valid(preamble_start_valid),
         .packet_start_count(packet_start_count),
