@@ -50,8 +50,8 @@ dropped.
 ## Dependency direction
 
 Research code may use this repository as a pinned dependency (a fixed commit or
-tag). This repository must not depend on, import from, or reference anything
-outside itself: CI, tests and examples run on a clean clone.
+tag). This repository must not depend on unpublished research repositories. Its declared public
+dependencies are installed normally; CI, tests and examples run on a clean clone.
 
 ## Pre-publication checklist
 
@@ -65,6 +65,6 @@ Before pushing to this repository:
 - [ ] no absolute local paths or internal host names (generated HDL:
       `python tools/normalize_generated_hdl.py`, checked by
       `tests/test_generated_hdl_paths.py`);
-- [ ] no development-tool session files, prompts, or local tool state
-      (see `.gitignore`);
+- [ ] no local development artifacts, temporary working files, machine-specific
+      state, or private notes;
 - [ ] CI and examples pass on a clean clone of this repository alone.
