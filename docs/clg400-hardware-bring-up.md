@@ -68,7 +68,8 @@ generation with Windows PowerShell 5.1 as follows:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-  fpga\board\clg400\package_board_b_boot_set.ps1
+  fpga\board\clg400\package_board_b_boot_set.ps1 `
+  -BaselineDir $env:BOARD_BASELINE_DIR -KernelImage $env:BOARD_KERNEL_IMAGE
 ```
 
 It validates every inherited file and both new build artifacts against fixed
