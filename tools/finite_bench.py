@@ -5,6 +5,7 @@ from collections import Counter
 import re
 
 from per_measure import decode_lora_symbol_trace, seq_of
+from lora_per_ideal import test_payload
 
 
 def parse_record(line: str) -> dict:
@@ -42,8 +43,14 @@ def parse_record(line: str) -> dict:
             raise ValueError("timestamp out of range")
         record.update(kind="packet", capture_valid=record["changed"] == 0, sym=symbols[:2*n])
         result = decode_lora_symbol_trace(list(bytes.fromhex(record["sym"])),
-                                         0 if record["realigned"] else record["pbin"]).result
-        record["crc"] = bool(result.crc_valid)
+                                         0 if record["realigned"] else record["pbin"],
+                                         require_payload_crc=True).result
+        # This finite bench sends explicit-header packets with payload CRC.
+        # The general decoder accepts CRC-disabled packets by design; a noisy
+        # header can flip that flag and must not bypass the bench CRC policy.
+        record["payload_crc_enabled"] = bool(result.header is not None and result.header.payload_crc)
+        record["crc"] = bool(record["payload_crc_enabled"] and result.crc_valid)
+        record["payload_hex"] = bytes(result.payload).hex()
         record["seq"] = seq_of(bytes(result.payload)) if record["crc"] else None
         reasons = []
         if record["changed"]: reasons.append("snapshot_changed")
@@ -71,17 +78,21 @@ def summarize(records: list[dict], first_sequence: int, planned: int,
     if planned < 1 or first_sequence < 0 or first_sequence + planned > 2**32:
         raise ValueError("invalid finite sequence range")
     counts = Counter(r.get("kind", "invalid") for r in records)
-    good = [r for r in records if r.get("capture_valid") and r.get("crc") and r.get("seq") is not None]
+    decoded = [r for r in records if r.get("capture_valid") and r.get("crc") and r.get("seq") is not None]
+    unvalidated = sum("payload_hex" not in r for r in decoded)
+    good = [r for r in decoded if r.get("payload_hex") == test_payload(r["seq"]).hex()]
     expected = range(first_sequence, first_sequence + planned)
     received = Counter(r["seq"] for r in good if r["seq"] in expected)
-    unexpected = sorted({r["seq"] for r in good if r["seq"] not in expected})
+    unexpected = sorted({r["seq"] for r in decoded if r["seq"] not in expected})
+    mismatches = sum(r["seq"] in expected and "payload_hex" in r and
+                     r["payload_hex"] != test_payload(r["seq"]).hex() for r in decoded)
     outcomes = []
     for seq in expected:
         matching = [r for r in good if r["seq"] == seq]
         outcomes.append({"seq": seq, "crc_valid": bool(matching),
                          "toa_valid": any(r.get("toa_valid", False) for r in matching),
                          "capture_ids": [r["cap"] for r in matching]})
-    invalid = counts["invalid"] + sum(r.get("kind") == "packet" and not r.get("capture_valid") for r in records)
+    invalid = counts["invalid"] + unvalidated + sum(r.get("kind") == "packet" and not r.get("capture_valid") for r in records)
     valid = bool(tx_complete and collection_complete and not invalid and not unexpected)
     return {"planned_transmissions": planned, "received_unique": len(received),
             "lost": planned - len(received), "per_method": "finite planned transmissions",
@@ -90,6 +101,7 @@ def summarize(records: list[dict], first_sequence: int, planned: int,
             "measurement_valid": valid, "tx_complete": tx_complete,
             "collection_complete": collection_complete,
             "duplicates": sum(n - 1 for n in received.values()), "unexpected_sequences": unexpected,
+            "payload_mismatches": mismatches, "unvalidated_payload_records": unvalidated,
             "packet_records": counts["packet"], "timeouts": counts["timeout"],
             "invalid_records": invalid,
             "crc_fail": sum(r.get("kind") == "packet" and not r.get("crc", False) for r in records),

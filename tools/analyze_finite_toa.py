@@ -12,6 +12,7 @@ import hashlib
 from pathlib import Path
 
 import numpy as np
+from lora_per_ideal import test_payload
 
 
 def robust_line(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
@@ -32,8 +33,11 @@ def analyze(report: dict) -> dict:
     trials = {t['sequence']: t for t in report.get('template_sidecar', {}).get('trials', [])}
     points = []
     for point in report['points']:
+        accepted = {x['seq'] for x in point['outcomes'] if x['crc_valid']} if 'outcomes' in point else None
         rows = [r for r in point['records'] if r.get('capture_valid') and r.get('crc')
                 and r.get('toa_valid') and r.get('seq') is not None
+                and (accepted is None or r['seq'] in accepted)
+                and ('payload_hex' not in r or r['payload_hex'] == test_payload(r['seq']).hex())
                 and config['first_sequence'] <= r['seq'] < config['first_sequence'] + config['packets']]
         counts = Counter(r['seq'] for r in rows)
         rows = sorted([r for r in rows if counts[r['seq']] == 1], key=lambda r: r['seq'])

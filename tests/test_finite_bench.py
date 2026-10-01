@@ -27,8 +27,23 @@ def line(**overrides):
 
 @pytest.fixture
 def decode(monkeypatch):
-    monkeypatch.setattr(bench, 'decode_lora_symbol_trace', lambda *a: SimpleNamespace(
-        result=SimpleNamespace(crc_valid=True, payload=b'ZLP1'+(12).to_bytes(4, 'little'))))
+    monkeypatch.setattr(bench, 'decode_lora_symbol_trace', lambda *a, **kw: SimpleNamespace(
+        result=SimpleNamespace(crc_valid=True, header=SimpleNamespace(payload_crc=True),
+                               payload=b'ZLP1'+(12).to_bytes(4, 'little'))))
+
+
+def test_crc_disabled_header_cannot_bypass_finite_bench_crc_policy():
+    from zynq_lora_phy import encode_lora_packet
+    data = b'ZLP1' + (12).to_bytes(4, 'little')
+    symbols = encode_lora_packet(data, payload_crc_present=False).symbols
+    decoded = bench.decode_lora_symbol_trace(symbols, 0).result
+    assert decoded.crc_valid and decoded.payload == data and not decoded.header.payload_crc
+    r = bench.parse_record(line(n=str(len(symbols)), sym=bytes(symbols).hex().ljust(256, '0')))
+    assert r['kind'] == 'packet' and r['capture_valid']
+    assert not r['crc'] and r['seq'] is None and not r['payload_crc_enabled']
+    summary = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert summary['measurement_valid'] and summary['received_unique'] == 0
+    assert summary['per'] == 1 and summary['crc_fail'] == 1
 
 
 def test_full_timestamp_retains_64_bit_precision_and_raw_record(decode):
@@ -61,7 +76,41 @@ def test_timeout_status_is_preserved():
 
 
 def packet(seq):
-    return dict(kind='packet', capture_valid=True, crc=True, seq=seq, cap=seq, toa_valid=True)
+    from lora_per_ideal import test_payload
+    return dict(kind='packet', capture_valid=True, crc=True, seq=seq, cap=seq, toa_valid=True,
+                payload_hex=test_payload(seq).hex())
+
+
+def test_undetected_crc_error_is_a_packet_loss_not_a_failed_trial():
+    r = packet(12)
+    bad = bytearray.fromhex(r['payload_hex'])
+    bad[-1] ^= 0x80
+    r['payload_hex'] = bad.hex()
+    result = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert result['measurement_valid'] and result['received_unique'] == 0
+    assert result['per'] == 1 and result['payload_mismatches'] == 1
+
+
+def test_missing_payload_validation_cannot_claim_a_qualified_per():
+    r = packet(12)
+    del r['payload_hex']
+    result = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert not result['measurement_valid'] and result['per'] is None
+    assert result['unvalidated_payload_records'] == 1
+
+
+def test_corrupt_payload_timestamp_is_excluded_from_repeatability():
+    rows = [dict(packet(i), toa_samples_q12=i * 100 * 4096) for i in range(4)]
+    bad = bytearray.fromhex(rows[3]['payload_hex'])
+    bad[-1] ^= 0x80
+    rows[3]['payload_hex'] = bad.hex()
+    summary = bench.summarize(rows, 0, 4, tx_complete=True, collection_complete=True)
+    point = dict(summary, snr_db=20, records=rows)
+    result = analyze({'schema': 'finite-per-v1',
+        'configuration': dict(tx_rate=1e6, gap=0, first_sequence=0, packets=4),
+        'samples_per_packet': 100, 'points': [point]})['points'][0]
+    assert result['usable_unique_toa'] == 3
+    assert [r['seq'] for r in result['samples']] == [0, 1, 2]
 
 
 def test_exact_denominator_includes_leading_trailing_and_long_losses():

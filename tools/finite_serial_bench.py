@@ -61,7 +61,9 @@ def summarize_serial(records, first, packets, final_counter, *, tx_complete, col
         ids.add(seq)
     counters = [r['rx_count'] for r in records]
     transport_complete = (counters == list(range(1,len(records)+1)) and final_counter == len(records))
-    valid = bool(tx_complete and collection_complete and transport_complete and not foreign and not corrupt)
+    # A known ID with corrupted content is an RF packet error, even if its
+    # CRC passed. Preserve the event and count the planned ID as lost.
+    valid = bool(tx_complete and collection_complete and transport_complete and not foreign)
     return {'measurement_valid':valid, 'per':1-len(ids)/packets if valid else None,
             'planned_packets':packets, 'received_unique':len(ids), 'usable_toa':0,
             'lost':packets-len(ids), 'crc_fail':crc_fail, 'duplicates':duplicates,
