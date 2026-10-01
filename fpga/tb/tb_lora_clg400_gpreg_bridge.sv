@@ -395,21 +395,30 @@ module tb_lora_clg400_gpreg_bridge;
         force dut.joint_timing_range_error = 1'b1;
         force dut.joint_precise_correction_applied = 1'b1;
         force dut.joint_timing_valid = 1'b1;
+        force dut.packet_straddle_detected = 1'b1;
+        force dut.packet_split_detected = 1'b1;
+        force dut.packet_early_sync_detected = 1'b1;
         @(negedge sample_clk);
         force dut.joint_up_search_abort_error = 1'b0;
         force dut.joint_down_search_abort_error = 1'b0;
         force dut.joint_timing_range_error = 1'b0;
         force dut.joint_precise_correction_applied = 1'b0;
         force dut.joint_timing_valid = 1'b0;
+        force dut.packet_straddle_detected = 1'b0;
+        force dut.packet_split_detected = 1'b0;
+        force dut.packet_early_sync_detected = 1'b0;
         repeat (4) @(posedge sample_clk);
 
         gp_ctrl = 32'h0004_1201;
         repeat (6) @(posedge ctrl_clk);
-        if (gp_status[4:0] !== 5'b11111) begin
-            $display("FAIL joint sticky bits before trace_rearm status=0x%08x (want bits 4:0 all set)",
+        // Bit 5 (M7): a packet was accepted only through the detector's
+        // straddle-tolerant path.
+        if (gp_status[7:0] !== 8'b11111111) begin
+            $display("FAIL joint sticky bits before trace_rearm status=0x%08x (want bits 7:0 all set)",
                      gp_status);
             $fatal(1);
         end
+        $display("PASS joint straddle (5), split (6) and early-sync (7) bits set with the other sticky bits");
 
         // Pulse bit 2 alone -- bit 1 (stream_reset) stays low throughout.
         gp_ctrl = 32'h0000_1205;
@@ -419,8 +428,8 @@ module tb_lora_clg400_gpreg_bridge;
 
         gp_ctrl = 32'h0004_1201;
         repeat (6) @(posedge ctrl_clk);
-        if (gp_status[4:0] !== 5'b00000) begin
-            $display("FAIL joint sticky bits survived trace_rearm alone: status=0x%08x",
+        if (gp_status[7:0] !== 8'b00000000) begin
+            $display("FAIL joint sticky bits (incl. straddle, split, early-sync) survived trace_rearm alone: status=0x%08x",
                      gp_status);
             $fatal(1);
         end
@@ -434,6 +443,109 @@ module tb_lora_clg400_gpreg_bridge;
             $fatal(1);
         end
         $display("PASS page 0 packet_seen survives trace_rearm (only stream_reset clears it)");
+
+        // Decision history (bit 3 freeze, bit 4 page, 12-bit index in 19-23 and
+        // 24-30). Every decision is kept, detected packet or not, so the 129
+        // decisions driven for the symbol trace above are all in the ring:
+        // entry 0 the detector-cycle decision, entries 1..128 the trace ones.
+        gp_ctrl = 32'h0000_1211;
+        repeat (6) @(posedge ctrl_clk);
+        expect32(gp_status, 32'h4448_0080, "history marker, not frozen, newest 128");
+        expect32(gp_sequence, 32'd129, "history decisions written");
+
+        // One more decision while the crossing's drop count reads 0x0105: the
+        // entry must carry its low byte, and the live count must read in full
+        // on the history page and on the clock page.
+        force dut.rx_cdc_drop_count = 16'h0105;
+        repeat (4) @(posedge sample_clk);
+        @(negedge sample_clk);
+        force dut.symbol_index = 32'h0000_0033;
+        force dut.symbol_confidence = 16'h1234;
+        force dut.symbol_sample_count = 64'h0000_0007_0000_0309;
+        force dut.symbol_valid = 1'b1;
+        @(negedge sample_clk);
+        force dut.symbol_valid = 1'b0;
+        repeat (8) @(posedge ctrl_clk);
+        expect32(gp_log_peak_q12, 32'h0000_0105, "history page live drop count");
+        gp_ctrl = 32'h0002_1201;
+        repeat (4) @(posedge ctrl_clk);
+        expect32(gp_log_peak_q12, 32'h0000_0105, "clock page live drop count");
+
+        // Freeze, then decisions must no longer be written.
+        gp_ctrl = 32'h0000_1219;
+        repeat (8) @(posedge ctrl_clk);
+        expect32(gp_status, 32'h4448_1081, "history frozen, newest 129");
+        expect32(gp_sequence, 32'd130, "history written before freeze");
+        @(negedge sample_clk);
+        force dut.symbol_valid = 1'b1;
+        repeat (5) @(negedge sample_clk);
+        force dut.symbol_valid = 1'b0;
+        repeat (8) @(posedge ctrl_clk);
+        expect32(gp_sequence, 32'd130, "history frozen: no decision written");
+
+        // Entry 0: the detector-cycle decision, detected flag set.
+        gp_ctrl = 32'h0000_1219;
+        repeat (5) @(posedge ctrl_clk);
+        expect32(gp_debug, 32'h0000_0000, "history read index echo 0");
+        expect32(gp_coarse_lo, 32'd100, "history entry 0 sample count");
+        expect32(gp_fractional_q12, 32'h0000_007f, "history entry 0 bin");
+        // Flags are {4'd0, grid_resync_armed, straddle, detected, valid} in
+        // bits 31:24. grid_resync_armed (bit 27) is the receiver's own state
+        // and is not asserted on here.
+        if (gp_coarse_hi[26:24] !== 3'b011 || gp_coarse_hi[31:28] !== 4'd0 ||
+                gp_coarse_hi[23:16] !== 8'h00 || gp_coarse_hi[15:0] !== 16'h7fff) begin
+            $display("FAIL history entry 0 flags/drop/confidence 0x%08x (want valid+detected, drop 0, conf 7fff)",
+                     gp_coarse_hi);
+            $fatal(1);
+        end
+        $display("PASS history entry 0 = detector-cycle decision, detected flag set");
+
+        // Entry 5 (low index bits only) and entry 128 (needs index bit 19).
+        gp_ctrl = 32'h0500_1219;
+        repeat (5) @(posedge ctrl_clk);
+        expect32(gp_debug, 32'h0005_0000, "history read index echo 5");
+        expect32(gp_coarse_lo, 32'd5096, "history entry 5 sample count");
+        expect32(gp_fractional_q12, 32'h0000_0044, "history entry 5 bin");
+        expect32({gp_coarse_hi[31:28], gp_coarse_hi[26:0]},
+                 {4'd0, 3'b001, 8'h00, 16'h0204},
+                 "history entry 5 flags (valid only), drop 0, confidence");
+        gp_ctrl = 32'h0008_1219;
+        repeat (5) @(posedge ctrl_clk);
+        expect32(gp_debug, 32'h0080_0000, "history read index echo 128");
+        expect32(gp_coarse_lo, 32'd131048, "history entry 128 sample count");
+        expect32(gp_fractional_q12, 32'h0000_00bf, "history entry 128 bin");
+        // Entry 129: the decision taken with the drop count at 0x0105.
+        gp_ctrl = 32'h0108_1219;
+        repeat (5) @(posedge ctrl_clk);
+        expect32(gp_coarse_lo, 32'h0000_0309, "history entry 129 sample count low word");
+        expect32(gp_fractional_q12, 32'h0000_0033, "history entry 129 bin");
+        // The straddle pulse forced in the joint-page test above came with no
+        // decision; a detection or straddle pulse is held until the next
+        // decision is written, so it lands on this entry (flag bit 26).
+        expect32({gp_coarse_hi[31:28], gp_coarse_hi[26:0]},
+                 {4'd0, 3'b101, 8'h05, 16'h1234},
+                 "history entry 129 drop count low byte and confidence");
+
+        // Release: the ring runs again.
+        release dut.rx_cdc_drop_count;
+        gp_ctrl = 32'h0000_1211;
+        repeat (6) @(posedge ctrl_clk);
+        @(negedge sample_clk);
+        force dut.symbol_valid = 1'b1;
+        @(negedge sample_clk);
+        force dut.symbol_valid = 1'b0;
+        repeat (8) @(posedge ctrl_clk);
+        expect32(gp_status, 32'h4448_0082, "history released, newest 130");
+        expect32(gp_sequence, 32'd131, "history writes again after release");
+
+        // Page 0 is untouched by any of this.
+        gp_ctrl = 32'h0000_1201;
+        repeat (3) @(posedge ctrl_clk);
+        if (gp_status[31:16] !== 16'h0001) begin
+            $display("FAIL page 0 status after history reads 0x%08x", gp_status);
+            $fatal(1);
+        end
+        $display("PASS decision history ring: writes, freeze, indexed read, drop count, release");
 
         $display("PASS tb_lora_clg400_gpreg_bridge");
         $finish;

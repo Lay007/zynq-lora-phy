@@ -13,6 +13,7 @@ module tb_lora_joint_chirp_grid_controller;
     reg packet_start_valid = 1'b0;
     reg [63:0] packet_start_count = 64'd0;
     reg [15:0] chips_to_boundary = 16'd0;
+    reg packet_straddle = 1'b0;
     reg [63:0] history_next_sample_count = 64'd0;
     reg search_busy = 1'b0;
     reg search_failed = 1'b0;
@@ -35,6 +36,8 @@ module tb_lora_joint_chirp_grid_controller;
     wire down_search_abort_error;
     wire precise_correction_applied;
     wire signed [15:0] diag_up_offset_frac_q12;
+    wire [63:0] toa_coarse;
+    wire signed [31:0] toa_fraction_q12;
 
     integer errors = 0;
 
@@ -58,6 +61,7 @@ module tb_lora_joint_chirp_grid_controller;
         .packet_start_valid(packet_start_valid),
         .packet_start_count(packet_start_count),
         .chips_to_boundary(chips_to_boundary),
+        .packet_straddle(packet_straddle),
         .history_next_sample_count(history_next_sample_count),
         .search_busy(search_busy),
         .search_failed(search_failed),
@@ -75,14 +79,21 @@ module tb_lora_joint_chirp_grid_controller;
         .timing_range_error(timing_range_error),
         .up_search_abort_error(up_search_abort_error),
         .down_search_abort_error(down_search_abort_error),
-        .precise_correction_applied(precise_correction_applied)
+        .precise_correction_applied(precise_correction_applied),
+        .toa_coarse(toa_coarse),
+        .toa_fraction_q12(toa_fraction_q12)
     );
 
-    task automatic pulse_packet(input [63:0] start_count, input [15:0] chips);
+    task automatic pulse_packet(
+        input [63:0] start_count,
+        input [15:0] chips,
+        input straddle = 1'b0
+    );
         begin
             @(negedge clk);
             packet_start_count <= start_count;
             chips_to_boundary <= chips;
+            packet_straddle <= straddle;
             packet_start_valid <= 1'b1;
             @(negedge clk);
             packet_start_valid <= 1'b0;
@@ -171,6 +182,24 @@ module tb_lora_joint_chirp_grid_controller;
         end
     endtask
 
+    // The packet time of arrival handed to the metadata path: up coarse start
+    // plus (up + down) / 2, as a whole sample and a Q12 remainder. It must be
+    // the joint time, not the up leg's peak, which a carrier offset moves.
+    task automatic expect_toa(
+        input [63:0] expected_coarse,
+        input signed [31:0] expected_fraction
+    );
+        begin
+            if (toa_coarse !== expected_coarse || toa_fraction_q12 !== expected_fraction) begin
+                errors = errors + 1;
+                $display("FAIL toa coarse=%0d fraction=%0d expected %0d %0d",
+                         toa_coarse, toa_fraction_q12, expected_coarse, expected_fraction);
+            end else begin
+                $display("PASS toa coarse=%0d fraction_q12=%0d", toa_coarse, toa_fraction_q12);
+            end
+        end
+    endtask
+
     initial begin
         repeat (4) @(posedge clk);
         resetn <= 1'b1;
@@ -185,6 +214,7 @@ module tb_lora_joint_chirp_grid_controller;
         wait_search(1'b1, 64'd20680);
         return_peak(64'd20694);
         expect_result(32'sd11, 32'd27);
+        expect_toa(64'd10451, 32'sd0);
 
         // Synthetic negative half-sum: chirp origin 30832 is 192 samples
         // before FFT window 31024 (previous window 30000); its forward phase
@@ -195,6 +225,8 @@ module tb_lora_joint_chirp_grid_controller;
         wait_search(1'b1, 64'd41072);
         return_peak(64'd41074);
         expect_result(-32'sd2, 32'd14);
+        // -1.5 rounds away to -2, leaving +0.5 sample: 30830 + 2048/4096.
+        expect_toa(64'd30830, 32'sd2048);
 
         // Synthetic positive half-sum: chirp origin 50872 is 152 before 51024,
         // so its forward phase is (1024-152)/8 = 109 chips.
@@ -206,9 +238,50 @@ module tb_lora_joint_chirp_grid_controller;
         return_peak(64'd61117);
         expect_result(32'sd2, 32'd18);
 
+        // A carrier offset: the up leg's peak sits 3.75 samples early and the
+        // down leg's 2.875 late (equal and opposite about the true time plus
+        // the timing). The up peak alone would put the packet at 10436.25;
+        // the joint time is (-3.75 + 2.875) / 2 = -0.4375 from the coarse
+        // start, i.e. 10440 with a -1792/4096 remainder.
+        pulse_packet(64'd10000, 16'd55);
+        wait_search(1'b0, 64'd10440);
+        return_peak(64'd10436, 16'sd1024);
+        wait_search(1'b1, 64'd20680);
+        return_peak(64'd20683, -16'sd512);
+        expect_result(32'sd0, 32'd16);
+        expect_toa(64'd10440, -32'sd1792);
+
         // A packet at 60512 lies halfway between grid origins 60000/61024.
         // The later decision window represents it; phase 64 chips must point
         // backwards to that packet, with the SFD at 60512 + 10*1024.
+        pulse_packet(64'd61024, 16'd64);
+        wait_search(1'b0, 64'd60512);
+        return_peak(64'd60512);
+        wait_search(1'b1, 64'd70752);
+        return_peak(64'd70752);
+        expect_result(32'sd0, 32'd16);
+
+        // M7: a packet the detector accepted through its straddle-tolerant
+        // path never wraps. Same phase (64 chips) and same packet at 60512,
+        // but the retained decision window is still the EARLIER one, 60000,
+        // so the arrival is 512 samples forward of it instead of 512 back
+        // of the later window. Without the flag this comes out a whole
+        // symbol early and the down search lands on the second sync symbol.
+        pulse_packet(64'd60000, 16'd64, 1'b1);
+        wait_search(1'b0, 64'd60512);
+        return_peak(64'd60512);
+        wait_search(1'b1, 64'd70752);
+        return_peak(64'd70752);
+        expect_result(32'sd0, 32'd16);
+        // The far end of the measured straddle band (73 chips = 584
+        // samples of advance) also stays unwrapped.
+        pulse_packet(64'd60000, 16'd73, 1'b1);
+        wait_search(1'b0, 64'd60584);
+        return_peak(64'd60584);
+        wait_search(1'b1, 64'd70824);
+        return_peak(64'd70824);
+        expect_result(32'sd0, 32'd16);
+        // And the flag is per packet: the next, unflagged packet wraps again.
         pulse_packet(64'd61024, 16'd64);
         wait_search(1'b0, 64'd60512);
         return_peak(64'd60512);

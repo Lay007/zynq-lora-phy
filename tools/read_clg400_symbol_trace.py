@@ -8,7 +8,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from zynq_lora_phy import decode_lora_symbol_trace
@@ -23,6 +23,10 @@ SAMPLE_HI = "0x79040508"
 METRICS = "0x79040548"
 DEBUG = "0x79040588"
 SIGNATURE = "0x790405c8"
+
+# "DH": the decision-history page (gp_ctrl bit 4) of the M8 diagnostic image.
+HISTORY_MARKER = 0x4448
+HISTORY_DEPTH = 4096
 
 
 def _signed32(value: int) -> int:
@@ -56,6 +60,11 @@ class ClockAccounting:
     search_clocks: int
     search_count: int
     crossing_overflow: bool
+    # Samples the receive crossing has dropped since boot (M8 diagnostic
+    # image). crossing_overflow is "at least once since boot" and was set on
+    # every capture of the M7 series; the count, compared between attempts,
+    # says whether a particular attempt lost samples. None on older images.
+    crossing_drop_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +79,11 @@ class JointEstimate:
 
     correction_samples: int
     up_offset_samples: int
+    # Low 32 bits only: the joint page has one register for it. The sample
+    # counter passes 2^32 every 71.6 minutes at 1 MS/s, so compare it with
+    # the 64-bit page-0 timestamp modulo 2^32 (on 2026-09-25 about half the
+    # records of a 3-hour series differed from page0_coarse by 2^32 or 2^33
+    # exactly, following the page-0 high word).
     up_coarse_start: int
     packet_start_count: int
     chips_to_boundary: int
@@ -84,6 +98,32 @@ class JointEstimate:
     down_search_aborted: bool
     timing_rejected_out_of_range: bool
     precise_correction_applied: bool
+    # STATUS bit 5, sticky like the four above: at least one packet since the
+    # last re-arm was accepted only through the detector's straddle-tolerant
+    # path (M7), i.e. one the generated sync rule alone would have lost.
+    detector_straddle_accepted: bool = False
+    # STATUS bit 6, sticky likewise: accepted only through the detector's
+    # split-tolerant path (M9) -- the preamble peak split into two lobes.
+    detector_split_accepted: bool = False
+    # STATUS bit 7, sticky likewise: accepted only through the detector's
+    # early-sync path -- the tie window at half a symbol read as sync.
+    detector_early_sync_accepted: bool = False
+
+
+class TraceNotComplete(ValueError):
+    """The frozen trace buffer holds no finished capture.
+
+    ``state`` is what the same read saw of the rest of the programmable logic:
+    the page-0 counters (metadata sequence, coarse ToA, status), the joint
+    page's sticky outcome bits and the clock page's crossing flag. Without it
+    a detection miss ("the detector never fired") cannot be told from a packet
+    that was detected but never traced, or from a sample stream that stalled,
+    once the next attempt's re-arm has cleared the sticky bits.
+    """
+
+    def __init__(self, message: str, state: dict[str, object]) -> None:
+        super().__init__(message)
+        self.state = state
 
 
 @dataclass(frozen=True)
@@ -95,6 +135,8 @@ class SymbolTrace:
     entries: tuple[TraceEntry, ...]
     clock: ClockAccounting | None = None
     joint: JointEstimate | None = None
+    # Page 0 at the time of the read (M8 tooling): the published timestamp.
+    timestamp: dict[str, object] | None = None
 
 
 def _ssh_args(args: argparse.Namespace) -> list[str]:
@@ -197,6 +239,16 @@ restore() {{ devmem {CONTROL} 32 "$orig" >/dev/null; }}
 trap restore EXIT HUP INT TERM
 sig=$(devmem {SIGNATURE} 32)
 printf 'SIGNATURE %s\\n' "$sig"
+histsel=$(((orig & 0x8000ffef) | 0x10))
+devmem {CONTROL} 32 "$histsel" >/dev/null
+printf 'HISTORY %s %s %s\\n' "$(devmem {STATUS} 32)" \\
+  "$(devmem {SEQUENCE} 32)" "$(devmem {METRICS} 32)"
+page0sel=$((orig & 0x80f8ffff))
+devmem {CONTROL} 32 "$page0sel" >/dev/null
+printf 'PAGE0 %s %s %s %s %s %s\\n' "$(devmem {STATUS} 32)" \\
+  "$(devmem {SEQUENCE} 32)" "$(devmem {SYMBOL} 32)" \\
+  "$(devmem {SAMPLE_LO} 32)" "$(devmem {SAMPLE_HI} 32)" \\
+  "$(devmem {METRICS} 32)"
 jointsel=$(((orig & 0x80f8ffff) | 0x00040000))
 devmem {CONTROL} 32 "$jointsel" >/dev/null
 printf 'JOINT %s %s %s %s %s %s\\n' "$(devmem {STATUS} 32)" \\
@@ -231,10 +283,32 @@ done
 """
 
 
+def _timestamp_summary(page0: list[int]) -> dict[str, object]:
+    """Page 0: the last packet timestamp the board published, as software sees it.
+
+    Registers in read order: STATUS, SEQUENCE, SYMBOL (coarse low word),
+    SAMPLE_LO (coarse high word), SAMPLE_HI (Q12 fraction, signed), METRICS
+    (log peak, signed). Until 2026-09-24 the script read only STATUS, SEQUENCE,
+    SAMPLE_LO and SAMPLE_HI and labelled the last two coarse_lo/coarse_hi, so
+    those two fields in earlier failure records are really coarse_hi and the
+    fraction.
+    """
+
+    return {
+        "page0_status": f"0x{page0[0]:08x}",
+        "page0_sequence": page0[1],
+        "page0_coarse": page0[2] | (page0[3] << 32),
+        "page0_fraction_q12": _signed32(page0[4]),
+        "page0_log_peak_q12": _signed32(page0[5]),
+    }
+
+
 def parse_trace(text: str) -> SymbolTrace:
     signature: int | None = None
     clock: ClockAccounting | None = None
     joint: JointEstimate | None = None
+    page0: list[int] | None = None
+    history: list[int] | None = None
     rows: list[tuple[int, ...]] = []
     for line in text.splitlines():
         fields = line.split()
@@ -242,6 +316,14 @@ def parse_trace(text: str) -> SymbolTrace:
             continue
         if fields[0] == "SIGNATURE" and len(fields) == 2:
             signature = int(fields[1], 0)
+        elif fields[0] == "PAGE0" and len(fields) == 7:
+            page0 = [int(value, 0) for value in fields[1:]]
+        elif fields[0] == "HISTORY" and len(fields) == 4:
+            values = [int(value, 0) for value in fields[1:]]
+            # Older images have no history page: bit 4 selects nothing and
+            # the read falls through to page 0, whose status has no marker.
+            if (values[0] >> 16) == HISTORY_MARKER:
+                history = values
         elif fields[0] == "JOINT" and len(fields) == 7:
             values = [int(value, 0) for value in fields[1:]]
             if (values[0] >> 16) != 0x4A54:
@@ -261,6 +343,9 @@ def parse_trace(text: str) -> SymbolTrace:
                 down_search_aborted=bool(values[0] & 4),
                 timing_rejected_out_of_range=bool(values[0] & 8),
                 precise_correction_applied=bool(values[0] & 16),
+                detector_straddle_accepted=bool(values[0] & 32),
+                detector_split_accepted=bool(values[0] & 64),
+                detector_early_sync_accepted=bool(values[0] & 128),
             )
         elif fields[0] == "CLOCK" and len(fields) == 6:
             values = [int(value, 0) for value in fields[1:]]
@@ -291,6 +376,8 @@ def parse_trace(text: str) -> SymbolTrace:
             rows.append(tuple([int(fields[1], 10)] + [int(value, 0) for value in fields[2:]]))
     if signature != 0x4C4F5241:
         raise ValueError(f"unexpected bridge signature: {signature!r}")
+    if history is not None and clock is not None:
+        clock = replace(clock, crossing_drop_count=history[2] & 0xFFFF)
     if not rows:
         raise ValueError("remote output contained no trace entries")
 
@@ -307,9 +394,39 @@ def parse_trace(text: str) -> SymbolTrace:
     capture_active = bool(status & 0x100)
     capture_complete = bool(status & 0x200)
     if capture_active or not capture_complete:
-        raise ValueError(
+        state: dict[str, object] = {
+            "trace_status": f"0x{status:08x}",
+            "capture_sequence": rows[0][2],
+        }
+        if page0 is not None:
+            state.update(
+                **_timestamp_summary(page0),
+            )
+        if joint is not None:
+            state.update(
+                joint_seen=joint.seen,
+                up_search_aborted=joint.up_search_aborted,
+                down_search_aborted=joint.down_search_aborted,
+                detector_straddle_accepted=joint.detector_straddle_accepted,
+                detector_split_accepted=joint.detector_split_accepted,
+                detector_early_sync_accepted=joint.detector_early_sync_accepted,
+            )
+        if clock is not None:
+            state.update(
+                crossing_overflow=clock.crossing_overflow,
+                clocks_per_sample_min=clock.clocks_per_sample_min,
+            )
+        if history is not None:
+            state.update(
+                crossing_drop_count=history[2] & 0xFFFF,
+                history_frozen=bool(history[0] & (1 << 12)),
+                history_newest=history[0] & 0xFFF,
+                history_written=history[1],
+            )
+        raise TraceNotComplete(
             f"symbol trace is not complete: active={capture_active}, "
-            f"captured={captured_count}"
+            f"captured={captured_count}",
+            state,
         )
     if captured_count > len(rows):
         raise ValueError("captured count exceeds returned trace depth")
@@ -328,8 +445,90 @@ def parse_trace(text: str) -> SymbolTrace:
     )
     return SymbolTrace(
         rows[0][2], preamble_bin, captured_count, grid_realigned, entries,
-        clock, joint
+        clock, joint, _timestamp_summary(page0) if page0 is not None else None
     )
+
+
+def _history_script(depth: int) -> str:
+    """Read the frozen decision-history ring (M8 diagnostic image).
+
+    Bit 3 is forced on so the ring stays stopped while it is read (the
+    recording command already set it the moment the recording ended); the
+    trap restores CONTROL as it found it, still frozen, and the next attempt's
+    arm releases it. The read index is 12 bits: 24-30 low, 19-23 high.
+    """
+
+    return f"""set -eu
+orig=$(devmem {CONTROL} 32)
+restore() {{ devmem {CONTROL} 32 "$orig" >/dev/null; }}
+trap restore EXIT HUP INT TERM
+base=$(((orig & 0x8000ffef) | 0x18))
+devmem {CONTROL} 32 "$base" >/dev/null
+printf 'HSTATUS %s %s %s\\n' "$(devmem {STATUS} 32)" \\
+  "$(devmem {SEQUENCE} 32)" "$(devmem {METRICS} 32)"
+i=0
+while [ "$i" -lt {depth} ]; do
+  devmem {CONTROL} 32 $((base | ((i & 0x7f) << 24) | ((i >> 7) << 19))) >/dev/null
+  printf 'H %u %s %s %s\\n' "$i" "$(devmem {SYMBOL} 32)" \\
+    "$(devmem {SAMPLE_LO} 32)" "$(devmem {SAMPLE_HI} 32)"
+  i=$((i + 1))
+done
+"""
+
+
+def parse_history(text: str, depth: int = HISTORY_DEPTH) -> dict[str, object]:
+    """Decode a history read into the ring's entries, oldest first."""
+
+    status: list[int] | None = None
+    raw: dict[int, tuple[int, int, int]] = {}
+    for line in text.splitlines():
+        fields = line.split()
+        if fields[:1] == ["HSTATUS"] and len(fields) == 4:
+            status = [int(value, 0) for value in fields[1:]]
+        elif fields[:1] == ["H"] and len(fields) == 5:
+            raw[int(fields[1], 10)] = tuple(int(value, 0) for value in fields[2:])
+    if status is None or (status[0] >> 16) != HISTORY_MARKER:
+        raise ValueError(
+            "no decision-history page: the bitstream predates the M8 diagnostics"
+        )
+    frozen = bool(status[0] & (1 << 12))
+    newest = status[0] & 0xFFF
+    written = status[1]
+    if written >= depth:
+        order = [(newest + 1 + k) % depth for k in range(depth)]
+    else:
+        order = list(range(written))
+    entries = []
+    for index in order:
+        if index not in raw:
+            continue
+        sample_count, packed, bin_word = raw[index]
+        flags = (packed >> 24) & 0xFF
+        if not flags & 1:
+            continue
+        entries.append(
+            {
+                "index": index,
+                "sample_count_low": sample_count,
+                "bin": bin_word & 0xFF,
+                "confidence_q15": packed & 0xFFFF,
+                "drop_count_low": (packed >> 16) & 0xFF,
+                "detected": bool(flags & 2),
+                "straddle": bool(flags & 4),
+                "grid_resync_armed": bool(flags & 8),
+            }
+        )
+    return {
+        "frozen": frozen,
+        "newest_index": newest,
+        "written": written,
+        "crossing_drop_count": status[2] & 0xFFFF,
+        "entries": entries,
+    }
+
+
+def read_history(args: argparse.Namespace, depth: int = HISTORY_DEPTH) -> dict[str, object]:
+    return parse_history(_run_remote(args, _history_script(depth)), depth)
 
 
 def read_trace(args: argparse.Namespace) -> SymbolTrace:
@@ -396,6 +595,7 @@ def _clock_summary(clock: ClockAccounting | None) -> dict[str, object] | None:
             and clock.search_clocks <= 2304 * clock.clocks_per_sample
         ),
         "crossing_overflow": clock.crossing_overflow,
+        "crossing_drop_count": clock.crossing_drop_count,
     }
 
 def _joint_summary(joint: JointEstimate | None) -> dict[str, object] | None:
@@ -424,6 +624,9 @@ def _joint_summary(joint: JointEstimate | None) -> dict[str, object] | None:
         "down_search_aborted": joint.down_search_aborted,
         "timing_rejected_out_of_range": joint.timing_rejected_out_of_range,
         "precise_correction_applied": joint.precise_correction_applied,
+        "detector_straddle_accepted": joint.detector_straddle_accepted,
+        "detector_split_accepted": joint.detector_split_accepted,
+        "detector_early_sync_accepted": joint.detector_early_sync_accepted,
     }
 
 
@@ -442,6 +645,12 @@ def build_report(trace: SymbolTrace) -> dict[str, object]:
         "grid_realigned": trace.grid_realigned,
         "receiver_clock": _clock_summary(trace.clock),
         "joint_estimate": _joint_summary(trace.joint),
+        # The published packet timestamp (page 0), read with the trace. On
+        # the M8 image it is the joint (up + down) / 2 time; before, the up
+        # leg's peak. Compare with joint_estimate: up_coarse_start + correction
+        # is the new one's whole-sample part, up_coarse_start + up_offset the
+        # old one's.
+        "timestamp": trace.timestamp,
         "decode": {
             "success": result.success,
             "header_valid": result.header_valid,

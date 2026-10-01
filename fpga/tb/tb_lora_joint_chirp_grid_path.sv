@@ -112,7 +112,7 @@ module tb_lora_joint_chirp_grid_path;
     integer stream_during_search = 0;
     integer stream_gap = 0;
     integer post_stream_gap = 0;
-    wire [2:0] dut_state = controller.state;
+    wire [3:0] dut_state = controller.state;
     reg timing_seen = 1'b0;
     real phase_cycles;
     real angle;
@@ -193,6 +193,7 @@ module tb_lora_joint_chirp_grid_path;
         .packet_start_valid(packet_start_valid),
         .packet_start_count(packet_start_count),
         .chips_to_boundary(chips_to_boundary),
+        .packet_straddle(1'b0),
         .history_next_sample_count(history_next_sample_count),
         .search_busy(search_busy), .search_failed(search_failed),
         .search_triplet_valid(triplet_valid),

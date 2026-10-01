@@ -37,6 +37,8 @@ from tools.read_clg400_symbol_trace import (  # noqa: E402
     CONTROL,
     _run_remote,
     build_report,
+    TraceNotComplete,
+    read_history,
     read_trace,
 )
 from tools.run_clg400_payload_capture import (  # noqa: E402
@@ -72,9 +74,12 @@ def arm_receive_stream(args: argparse.Namespace, full: bool = True) -> str:
     """
 
     set_bit, clear_mask = (2, 0xFFFFFFFD) if full else (4, 0xFFFFFFFB)
+    # Both also release the decision-history freeze (bit 3) that the previous
+    # recording set, so the ring runs again for this attempt.
+    clear_mask &= 0xFFFFFFF7
     script = f"""set -eu
 orig=$(devmem {CONTROL} 32)
-reset=$((orig | {set_bit}))
+reset=$(((orig & 0xFFFFFFF7) | {set_bit}))
 run=$((orig & {clear_mask}))
 devmem {CONTROL} 32 "$reset" >/dev/null
 sleep 1
@@ -101,10 +106,16 @@ def iio_capture_command(samples: int, remote_path: str) -> str:
     # killed when that shell exits and the recording silently comes back empty.
     # nohup with stdin detached from the closing channel is what keeps it
     # alive long enough to span the transmission.
+    # The moment the recording ends, freeze the decision-history ring (control
+    # bit 3, M8 diagnostic image; unused and harmless on older images). The
+    # ring holds about four seconds of decisions and the packet is about 1.3 s
+    # into a 1.5 s recording, so it must stop here, not after the trace read,
+    # or a missed packet's decisions are overwritten before anyone looks.
     inner = (
         f"iio_readdev -u local: -b 32768 -s {samples} cf-ad9361-lpc "
         f"voltage0 voltage1 > {remote_path} 2>{remote_path}.err; "
-        f"echo $? > {remote_path}.done"
+        f"s=$?; devmem {CONTROL} 32 $(( $(devmem {CONTROL} 32) | 8 )); "
+        f"echo $s > {remote_path}.done"
     )
     return (
         f"rm -f {remote_path} {remote_path}.done {remote_path}.err; "
@@ -226,6 +237,35 @@ def burst_ratio(path: Path) -> float:
     return float(smooth.max() / median)
 
 
+def iq_worth_keeping(report: dict) -> bool:
+    """Whether a successful attempt's recording is evidence worth its 6 MB.
+
+    Failed attempts always keep theirs (the failure path never deletes). Of
+    the successful ones, keep what a later replay would be needed for: a CRC
+    failure, and a packet accepted only through one of the detector's rescue
+    paths (straddle, split, early sync) or with the joint estimate aborted,
+    rejected or not applied. An ordinary decoded packet's recording adds
+    nothing its trace record does not already say.
+    """
+
+    if not report.get("decode", {}).get("crc_valid"):
+        return True
+    joint = report.get("joint_estimate") or {}
+    if not joint.get("precise_correction_applied"):
+        return True
+    return any(
+        joint.get(flag)
+        for flag in (
+            "detector_straddle_accepted",
+            "detector_split_accepted",
+            "detector_early_sync_accepted",
+            "up_search_aborted",
+            "down_search_aborted",
+            "timing_rejected_out_of_range",
+        )
+    )
+
+
 def capture_once(
     args: argparse.Namespace, full_rearm: bool = True
 ) -> dict[str, object]:
@@ -247,6 +287,7 @@ def capture_once(
     serial_log = args.run_dir / f"heltec-{stamp}.log"
     local_iq = args.run_dir / f"rx1-iq-{stamp}.bin"
     stage = "prepare_transmitter"
+    record = None
     try:
         # The transmitter is prepared *before* the recording starts. Verifying
         # the profile takes seconds of serial round trips; doing it inside the
@@ -349,6 +390,39 @@ def capture_once(
                 "transmitted_utc": stamp,
             },
         }
+        if record is not None:
+            failure["serial"]["tx_sequence"] = record["sequence"]
+            failure["serial"]["tx_start_ms"] = record["start_ms"]
+        # The sticky bits are cleared by the next attempt's re-arm, so the
+        # programmable logic's own account of a miss exists only right now.
+        if isinstance(error, TraceNotComplete):
+            failure["pl_state"] = error.state
+            # On the M8 diagnostic image the ring still holds the decisions
+            # the detector took over the missed packet. Reading 4096 entries
+            # takes tens of seconds; only a miss is worth it.
+            try:
+                slow = argparse.Namespace(**vars(args))
+                slow.command_timeout = max(args.command_timeout, 600)
+                failure["decision_history"] = read_history(slow)
+            except Exception as history_error:  # noqa: BLE001
+                failure["decision_history_error"] = (
+                    f"{type(history_error).__name__}: {history_error}"
+                )
+        # When the recording finished but the trace could not be read, the
+        # IQ still says whether a packet was on the air: without it, "the
+        # programmable logic never detected it" and "nothing was received"
+        # look identical in the record. Best effort only; a failure here must
+        # not replace the original error.
+        if stage in ("read_trace", "fetch_iq", "check_burst_ratio"):
+            try:
+                if not local_iq.exists():
+                    fetch_binary(args, REMOTE_IQ, local_iq)
+                failure["iq_capture"] = local_iq.name
+                failure["iq_burst_ratio"] = round(burst_ratio(local_iq), 1)
+            except Exception as fetch_error:  # noqa: BLE001
+                failure["iq_fetch_error"] = (
+                    f"{type(fetch_error).__name__}: {fetch_error}"
+                )
         trace_path = args.run_dir / f"clg400-trace-{stamp}.json"
         trace_path.write_text(
             json.dumps(failure, indent=2, ensure_ascii=False) + "\n",
@@ -356,6 +430,10 @@ def capture_once(
         )
         raise
 
+    if args.keep_iq == "anomalies" and not iq_worth_keeping(report):
+        local_iq.unlink()
+        report["serial"]["iq_capture"] = None
+        report["iq_discarded"] = True
     trace_path = args.run_dir / f"clg400-trace-{stamp}.json"
     trace_path.write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -394,11 +472,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gap-s", type=float, default=1.5)
     parser.add_argument("--capture-timeout-s", type=float, default=60)
     parser.add_argument(
+        "--full-rearm-every-attempt",
+        action="store_true",
+        help="pulse stream_reset (which zeros the absolute sample counter) "
+        "before every attempt instead of only the first; the control arm "
+        "for comparing against the default trace_rearm path",
+    )
+    parser.add_argument(
         "--min-burst-ratio",
         type=float,
         default=50.0,
         help="reject a recording whose peak-to-median power is below this; "
         "a real packet gives several hundred, noise alone gives about one",
+    )
+    parser.add_argument(
+        "--keep-iq",
+        choices=["all", "anomalies"],
+        default="all",
+        help="'anomalies' deletes the 6 MB recording of an ordinary decoded "
+        "packet after its record is written (see iq_worth_keeping); failed "
+        "attempts always keep theirs. For long series on a full disk.",
     )
     return parser.parse_args()
 
@@ -412,7 +505,9 @@ def main() -> int:
             # (guaranteeing a clean start); every attempt after it re-arms
             # with trace_rearm instead (M6), so the series keeps one
             # continuous absolute sample counter across all of it.
-            capture_once(args, full_rearm=(index == 0))
+            capture_once(
+                args, full_rearm=(index == 0 or args.full_rearm_every_attempt)
+            )
             completed += 1
         except Exception as error:  # noqa: BLE001 - one attempt must not end the run
             print(

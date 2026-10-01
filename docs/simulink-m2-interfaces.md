@@ -16,7 +16,7 @@ license was **checked out**, not only tested for presence.
 |---|---|
 | Host | Windows 10 Pro 10.0.19045, win64 |
 | MATLAB | R2025a, version `25.1.0.2943329` |
-| Install root | `C:\Program Files\MATLAB\R2025a` |
+| Install root | `<MATLAB_INSTALL_ROOT>` |
 | License file | `licenses/license_WIN-F9DVUKQOSB0_968398_R2025a.lic` |
 
 | Product | Version | License feature | `license("test")` | `license("checkout")` |

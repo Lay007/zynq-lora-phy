@@ -8,21 +8,25 @@ from pathlib import Path
 
 
 def summarize(paths: list[Path], planned_attempts: int) -> dict:
-    if planned_attempts < 1:
+    if type(planned_attempts) is not int or planned_attempts < 1:
         raise ValueError("planned_attempts must be positive")
+    if len({path.resolve() for path in paths}) != len(paths):
+        raise ValueError("duplicate records; select each attempt once")
     if len(paths) > planned_attempts:
         raise ValueError("more records than planned attempts; select one campaign")
     captured = crc_pass = unknown = 0
     failures: Counter[str] = Counter()
     for path in paths:
         record = json.loads(path.read_text(encoding="utf-8"))
-        if record.get("schema") != "zynq-lora-clg400-symbol-trace-v1":
+        if not isinstance(record, dict) or record.get("schema") != "zynq-lora-clg400-symbol-trace-v1":
             raise ValueError(f"unsupported schema: {path}")
         if record.get("status") == "failed":
-            failures[record.get("stage", "unknown")] += 1
+            stage = record.get("stage")
+            failures[stage if isinstance(stage, str) and stage else "unknown"] += 1
         elif (record.get("status") in (None, "ok")
-              and isinstance(record.get("iq_samples"), int)
+              and type(record.get("iq_samples")) is int
               and record["iq_samples"] > 0
+              and isinstance(record.get("decode"), dict)
               and isinstance(record.get("decode", {}).get("crc_valid"), bool)):
             captured += 1
             crc_pass += int(record["decode"]["crc_valid"])

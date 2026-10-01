@@ -11,22 +11,29 @@ PHY processing chain, make internal measurements observable, and provide a
 repeatable path from a MATLAB floating-point reference model through Simulink
 and generated Verilog to a ZynqSDR implementation.
 
+The repository is a self-contained baseline for the standard LoRa / LoRa-like
+PHY, SDR acquisition, synchronization, timestamping and positioning; related
+waveform-design research builds on it and is maintained separately (see
+[scope and boundary](docs/public_private_boundary.md)).
+
 For the smaller generic CSS learning path and readable SF7 baseline RTL, see the
 companion [`zynq-sdr-course`](https://github.com/Lay007/zynq-sdr-course). The
 [project-boundary ADR](docs/architecture-decisions/0003-course-project-boundary.md)
 defines why generated LoRa HDL is not duplicated there.
 
-> Status (2026-09-19): M1/M2 models and M3 generated/portable RTL are
-> established. M4/M5 now include real SF7/BW125/L=8 reception on CLG400:
-> the two non-clipping gain-25 campaigns report **90 attempts, 84 captures,
-> 81 CRC passes**, including **79/79 at `grid_err=0`**. These are capture/CRC
-> results, not calibrated ToA accuracy or a qualification PER.
-> [Committed experiment log](docs/clg400-joint-grid-experiment.md) records the
-> conditions and limitations; raw run directories are local, not published here.
-> M6 preparation separates `trace_rearm` from the epoch-resetting `stream_reset`
-> and passes the two-packet RTL regression. Its new bitstream, continuous
-> hardware campaign, delay calibration and synchronized TDoA remain pending.
-> See the [qualification gates](docs/qualification-gates.md) for issues #28/#29.
+> Status: MATLAB M1 and the streaming fixed-point M2 path are complete, with
+> generated M3 Verilog, exact 8/8 HDL cosimulation for ToA, Vivado IP packaging,
+> a routed CLG400 board design, and a cold-bootable ZynqSDR image. Hardware
+> reception is now demonstrated: real over-the-air Heltec V4.3/SX1262 packets
+> decode on ZynqSDR with valid explicit header and payload CRC. In the latest
+> 500-attempt M7 guard-image campaign, 492 packets were captured and all 492
+> passed CRC with zero PL grid errors; the other attempts included five
+> transmitter-side failures and three PL detector misses. The M6 continuous PL
+> sample-time counter was also verified across 47 captures spanning 803.7 s.
+> Controlled cable-delay calibration, the 1,000-packet qualification target,
+> common-time synchronization across receivers, and hardware multi-receiver
+> TDoA positioning remain open, so the repository does not yet claim a
+> synchronized positioning system.
 
 ## Project goals
 
@@ -40,12 +47,22 @@ defines why generated LoRa HDL is not duplicated there.
 - Keep experiments reproducible through versioned configurations, captures,
   metrics, and reports.
 
-The first hardware milestone is deliberately narrow:
+### Engineering collaboration
 
-> Complete and validate the MATLAB floating-point PHY and ToA/TDoA algorithms,
-> beginning with the receiver at BW 125 kHz and SF7. Then reproduce HDL-bound
-> blocks as a streaming Simulink model and generate dechirp, FFT, peak-detector,
-> and timing Verilog from that model using the same test vectors.
+This repository also serves as public evidence for focused R&D work in LoRa/CSS
+PHY, SDR acquisition, packet timing, ToA/TDoA, MATLAB/Simulink-to-FPGA flows,
+and measurement-driven verification. For consulting or project collaboration,
+see the [engineering portfolio](https://lay007.github.io/) or
+[GitHub profile](https://github.com/Lay007).
+
+
+The current hardware qualification focus is deliberately narrow:
+
+> Stabilize and quantify the SF7 / BW 125 kHz hardware receiver, complete the
+> controlled packet/PER campaign, calibrate the single-receiver timing chain,
+> and only then extend the validated timestamp path to synchronized
+> multi-receiver TDoA. MATLAB, Simulink, generated HDL, raw IQ, PL metadata, and
+> hardware measurements remain tied to shared acceptance evidence.
 
 ## Current contents
 
@@ -224,6 +241,8 @@ frequency offset, compensates the known offset, and demodulates the symbols.
 ## Architecture and plan
 
 - [System architecture](docs/architecture.md)
+- [Development guide](docs/development.md)
+- [Repository scope and boundary](docs/public_private_boundary.md)
 - [Roadmap and acceptance criteria](docs/roadmap.md)
 - [MATLAB M1 floating-point acceptance](docs/matlab-m1-acceptance.md)
 - [Hardware test bench](docs/test-bench.md)

@@ -253,11 +253,25 @@ timing, and reports the same symbols as MATLAB/Simulink for the regression set.
   covered by `tb_lora_joint_grid_completion`, which now requires the guard
   back whatever the estimate does. A `search_abort_error` output makes the
   abort visible.
-- [x] Add sticky abort diagnostics and investigate joint-grid placement.
-  The September 19 M5 log reports 81/84 CRC across 90 attempts at gain 25 dB,
-  with 79/79 CRC at zero grid error. See [the experiment log](clg400-joint-grid-experiment.md).
-- [ ] Explain the remaining five nonzero-grid captures and qualify against
-  all planned attempts; this small series does not satisfy the 1,000-packet gate.
+- [x] Tell the joint search's silent outcomes apart (sticky up/down abort,
+  range rejection and "precise correction applied" bits) and find the grid
+  placement defect against ground truth. Sub-sample interpolation in the
+  joint estimator followed; at gain 25 dB every capture with zero grid error
+  decodes. See [the experiment log](clg400-joint-grid-experiment.md), steps M4-M5.
+- [x] Keep one absolute sample timebase across a capture series: `trace_rearm`
+  re-arms the symbol trace and grid resync without zeroing the counter;
+  confirmed on hardware over 803.7 s (experiment log, step M6).
+- [x] Close the detector's blind band at the preamble/sync boundary (about 7%
+  of arrival phases) with a straddle-tolerant path, guarded against silence.
+  On hardware: detection misses 12 of 196 (6.1%) before, 5 of 798 (0.63%)
+  after; all 46 packets accepted through the new path decode (experiment log,
+  step M7).
+- [ ] Explain the remaining detection misses (not reproducible by replaying the
+  recording through the RTL at any arrival phase) and the 1-sample grid errors
+  seen only in the first ~35 minutes after a cold boot (not a CFO effect in
+  the model or the RTL). A diagnostic image with a decision-history ring and a
+  receive-crossing drop count is built, not yet deployed (step M8).
+  Ordering: [qualification gates](qualification-gates.md).
 - [ ] Measure symbol error rate and PER over a controlled cable path.
 - [ ] Extend to the complete packet PHY and bidirectional interoperability.
 - [ ] Measure PER versus SNR/input power and CFO/SFO tolerance.
@@ -280,12 +294,6 @@ Acceptance: published bias, standard deviation, and outlier rate over a defined
 input range; all raw-data checksums and configurations are retained.
 
 ## M6 — Three-receiver synchronized TDoA
-
-- [x] Separate trace/grid re-arm from the absolute sample-counter reset;
-  two-packet RTL regression checks coarse values 1024 and 18832 in one epoch.
-- [ ] Build/route and cold-boot the M6 image, record its hash and timing report,
-  then verify continuous epoch on hardware before the 1,000-attempt campaign.
-  Follow [issues #28/#29 qualification gates](qualification-gates.md).
 
 - [ ] Verify external reference and synchronization access on every ZynqSDR.
 - [ ] Distribute a common clock and epoch pulse directly to PL.

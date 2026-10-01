@@ -133,3 +133,45 @@ snr_db, crc_ok, payload, calibration_id, software_revision
 
 Field names include units so that experiments can be compared without hidden
 conventions.
+
+## Processing chains
+
+The same chains run in simulation, on recorded IQ and on the board, so a
+result can be traced from a synthetic stimulus to a hardware measurement.
+
+**Transmit / stimulus.** `zynq_lora_phy.encode_lora_packet` (whitening,
+Hamming/FEC, diagonal interleaving, header, CRC) gives the symbols;
+`tools/lora_tx_waveform.py` modulates them into IQ at the receiver sample
+rate; `board/per/lora_tx_noise.c` streams packets through the AD9361
+transmitter with AWGN added per sample at a set SNR. SX1262 (Heltec V4) and
+LR1121 (LilyGO T3-S3) firmware in `firmware/` serve as independent
+transmitters and reference receivers.
+
+**Receive.** AD9361 IQ at 1 MS/s → PL: FFT correlator (dechirp + FFT
+identity, generated from Simulink), preamble and sync-word detection, symbol
+grid alignment, joint timing/CFO search on the IQ history buffer, CFO
+derotation, 64-bit sample counter and fractional ToA → symbol trace and
+timestamp metadata over AXI-Lite → host decode
+(`zynq_lora_phy.lora_packet.decode_lora_symbol_trace`: Gray mapping,
+deinterleaving, Hamming, header checksum, dewhitening, CRC).
+
+**Experiment.** Synthetic IQ with CFO/SFO/noise impairments → RTL replay
+(`tools/replay_iq_through_rtl.py`, `fpga/tb/tb_replay_detect.sv`) →
+single-board validation → board route → packet campaigns
+(`tools/run_clg400_payload_capture.py`) and the PER bench
+(`tools/per_measure.py`, [PER curves](per-curves-experiment.md)) → multiple
+synchronized receivers → ToA/TDoA baseline. Every run records its
+configuration, board state and provenance next to the data.
+
+**Positioning.** Per-receiver PL timestamps → delay calibration (`d_i`
+above) → cross-receiver event association → TDoA multilateration
+(`zynq_lora_phy.tdoa`, `model/matlab`) with an uncertainty estimate.
+
+## Relationship to related research
+
+This repository provides the reusable PHY, SDR acquisition, synchronization,
+timestamping and positioning baseline used by related research projects.
+Experimental waveform design and unpublished optimization methods are
+intentionally maintained separately; they depend on a pinned revision of this
+repository and never the reverse. See
+[repository scope and boundary](public_private_boundary.md).

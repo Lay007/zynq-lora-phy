@@ -48,6 +48,7 @@ module lora_clg400_gpreg_bridge #(
     wire [31:0] rx_payload;
     wire        rx_valid;
     wire        rx_cdc_overflow;
+    wire [15:0] rx_cdc_drop_count;
 
     lora_async_sample_fifo #(
         .WIDTH(32),
@@ -61,7 +62,8 @@ module lora_clg400_gpreg_bridge #(
         .rd_clk(sample_clk),
         .rd_resetn(sample_resetn),
         .rd_valid(rx_valid),
-        .rd_data(rx_payload)
+        .rd_data(rx_payload),
+        .rd_drop_count(rx_cdc_drop_count)
     );
 
     wire signed [15:0]      rx_i = rx_payload[31:16];
@@ -73,8 +75,10 @@ module lora_clg400_gpreg_bridge #(
     wire receiver_requested = ctrl_sample_sync[0];
     wire stream_reset = !receiver_requested || ctrl_sample_sync[1];
     // gp_ctrl bit layout: 0 receiver_requested, 1 stream_reset, 2 trace_rearm,
+    // 3 decision-history freeze, 4 decision-history page select,
     // 8-15 configured_sync_word, 16/17/18 symbol/clock/joint page select,
-    // 24-30 trace read index. Bits 3-7, 19-23 and 31 are unused.
+    // 24-30 trace read index, which with 19-23 above it is also the 12-bit
+    // decision-history read index. Bits 5-7 and 31 are unused.
     //
     // trace_rearm re-arms the one-shot 128-entry symbol trace and the grid
     // resync's "armed" latch for the next packet without stream_reset's
@@ -84,6 +88,9 @@ module lora_clg400_gpreg_bridge #(
     // distinction and why every other module in the receiver already
     // returns to a ready state between packets on its own.
     wire trace_rearm = ctrl_sample_sync[2];
+    // Holding bit 3 stops the decision-history ring so software can read it;
+    // see lora_decision_history_buffer.v.
+    wire history_freeze = ctrl_sample_sync[3];
     wire [7:0] configured_sync_word =
         (ctrl_sample_sync[15:8] == 8'h00) ? 8'h12 : ctrl_sample_sync[15:8];
 
@@ -131,6 +138,13 @@ module lora_clg400_gpreg_bridge #(
     wire joint_down_search_abort_error;
     wire joint_timing_range_error;
     wire joint_precise_correction_applied;
+    // The detector accepted the sync word only through its straddle-tolerant
+    // path (M7): a packet the generated rule alone would have lost.
+    wire packet_straddle_detected;
+    // ... or only through its split-tolerant path (M9).
+    wire packet_split_detected;
+    // ... or only through its early-sync path.
+    wire packet_early_sync_detected;
 
     wire unused_awready;
     wire unused_wready;
@@ -181,6 +195,9 @@ module lora_clg400_gpreg_bridge #(
         .symbol_sample_count(symbol_sample_count),
         .symbol_timestamp_valid(symbol_timestamp_valid),
         .detected(packet_detected),
+        .packet_straddle_detected(packet_straddle_detected),
+        .packet_split_detected(packet_split_detected),
+        .packet_early_sync_detected(packet_early_sync_detected),
         .preamble_detected(),
         .sync_valid(),
         .preamble_bin(preamble_bin),
@@ -291,6 +308,65 @@ module lora_clg400_gpreg_bridge #(
         .ctrl_capture_sequence(trace_capture_sequence_ctrl)
     );
 
+    // Every detector decision, detected packet or not (see the module header
+    // for the five M7 misses this is for).
+    wire [11:0] history_read_index_ctrl = {gp_ctrl[23:19], gp_ctrl[30:24]};
+    wire [31:0] history_sample_count_ctrl;
+    wire [7:0]  history_bin_ctrl;
+    wire [15:0] history_confidence_ctrl;
+    wire [7:0]  history_drop_low_ctrl;
+    wire [7:0]  history_flags_ctrl;
+    wire [11:0] history_newest_ctrl;
+    wire [31:0] history_written_ctrl;
+    wire        history_frozen_ctrl;
+
+    lora_decision_history_buffer #(
+        .ADDR_WIDTH(12)
+    ) u_decision_history (
+        .sample_clk(sample_clk),
+        .sample_resetn(sample_resetn),
+        .freeze(history_freeze),
+        .symbol_valid(symbol_valid),
+        .symbol_index(symbol_index),
+        .confidence(symbol_confidence),
+        .symbol_sample_count(symbol_sample_count),
+        .packet_detected(packet_detected),
+        .straddle_detected(packet_straddle_detected),
+        .grid_resync_armed(grid_resync_armed),
+        .drop_count(rx_cdc_drop_count),
+        .ctrl_clk(ctrl_clk),
+        .ctrl_resetn(ctrl_resetn),
+        .ctrl_read_index(history_read_index_ctrl),
+        .ctrl_sample_count(history_sample_count_ctrl),
+        .ctrl_bin(history_bin_ctrl),
+        .ctrl_confidence(history_confidence_ctrl),
+        .ctrl_drop_low(history_drop_low_ctrl),
+        .ctrl_flags(history_flags_ctrl),
+        .ctrl_newest_index(history_newest_ctrl),
+        .ctrl_written_count(history_written_ctrl),
+        .ctrl_frozen(history_frozen_ctrl)
+    );
+
+    // The crossing's drop count, re-crossed to the control domain as Gray
+    // code (it advances by at most one per sample clock).
+    wire [15:0] drop_gray_sample = rx_cdc_drop_count ^ (rx_cdc_drop_count >> 1);
+    (* ASYNC_REG = "TRUE" *) reg [15:0] drop_gray_ctrl_meta;
+    (* ASYNC_REG = "TRUE" *) reg [15:0] drop_gray_ctrl_sync;
+    reg [15:0] drop_count_ctrl;
+    integer drop_bit;
+    always @(posedge ctrl_clk) begin
+        if (!ctrl_resetn) begin
+            drop_gray_ctrl_meta <= 16'd0;
+            drop_gray_ctrl_sync <= 16'd0;
+            drop_count_ctrl     <= 16'd0;
+        end else begin
+            drop_gray_ctrl_meta <= drop_gray_sample;
+            drop_gray_ctrl_sync <= drop_gray_ctrl_meta;
+            for (drop_bit = 0; drop_bit < 16; drop_bit = drop_bit + 1)
+                drop_count_ctrl[drop_bit] <= ^(drop_gray_ctrl_sync >> drop_bit);
+        end
+    end
+
     // Joint estimator numbers, frozen when the estimate completes.
     //
     // The correction the board applies is not the one the reference model
@@ -320,6 +396,13 @@ module lora_clg400_gpreg_bridge #(
     reg        joint_down_abort_sticky_sample;
     reg        joint_range_error_sticky_sample;
     reg        joint_precise_applied_sticky_sample;
+    // Sticky like the four above (joint_status bit 5): at least one packet
+    // since the last re-arm was accepted through the straddle-tolerant path.
+    reg        joint_straddle_sticky_sample;
+    // joint_status bit 6: at least one packet since the last re-arm was
+    // accepted only through the split-tolerant path (M9).
+    reg        joint_split_sticky_sample;
+    reg        joint_early_sticky_sample;
 
     always @(posedge sample_clk) begin
         if (!sample_resetn) begin
@@ -334,13 +417,25 @@ module lora_clg400_gpreg_bridge #(
             joint_down_abort_sticky_sample      <= 1'b0;
             joint_range_error_sticky_sample     <= 1'b0;
             joint_precise_applied_sticky_sample <= 1'b0;
+            joint_straddle_sticky_sample        <= 1'b0;
+            joint_split_sticky_sample           <= 1'b0;
+            joint_early_sticky_sample           <= 1'b0;
         end else if (stream_reset || trace_rearm) begin
             joint_seen_sample         <= 1'b0;
             joint_up_abort_sticky_sample        <= 1'b0;
             joint_down_abort_sticky_sample      <= 1'b0;
             joint_range_error_sticky_sample     <= 1'b0;
             joint_precise_applied_sticky_sample <= 1'b0;
+            joint_straddle_sticky_sample        <= 1'b0;
+            joint_split_sticky_sample           <= 1'b0;
+            joint_early_sticky_sample           <= 1'b0;
         end else begin
+            if (packet_straddle_detected)
+                joint_straddle_sticky_sample <= 1'b1;
+            if (packet_split_detected)
+                joint_split_sticky_sample <= 1'b1;
+            if (packet_early_sync_detected)
+                joint_early_sticky_sample <= 1'b1;
             if (joint_up_search_abort_error)
                 joint_up_abort_sticky_sample <= 1'b1;
             if (joint_down_search_abort_error)
@@ -458,6 +553,12 @@ module lora_clg400_gpreg_bridge #(
     // joint_*_sticky_sample above.
     (* ASYNC_REG = "TRUE" *) reg [3:0] joint_sticky_meta;
     (* ASYNC_REG = "TRUE" *) reg [3:0] joint_sticky_sync;
+    (* ASYNC_REG = "TRUE" *) reg       joint_straddle_meta;
+    (* ASYNC_REG = "TRUE" *) reg       joint_straddle_sync;
+    (* ASYNC_REG = "TRUE" *) reg       joint_split_meta;
+    (* ASYNC_REG = "TRUE" *) reg       joint_split_sync;
+    (* ASYNC_REG = "TRUE" *) reg       joint_early_meta;
+    (* ASYNC_REG = "TRUE" *) reg       joint_early_sync;
     (* ASYNC_REG = "TRUE" *) reg [31:0] joint_a_meta;
     (* ASYNC_REG = "TRUE" *) reg [31:0] joint_a_sync;
     (* ASYNC_REG = "TRUE" *) reg [31:0] joint_b_meta;
@@ -574,6 +675,12 @@ module lora_clg400_gpreg_bridge #(
             joint_seen_sync    <= 1'b0;
             joint_sticky_meta  <= 4'd0;
             joint_sticky_sync  <= 4'd0;
+            joint_straddle_meta <= 1'b0;
+            joint_straddle_sync <= 1'b0;
+            joint_split_meta <= 1'b0;
+            joint_split_sync <= 1'b0;
+            joint_early_meta <= 1'b0;
+            joint_early_sync <= 1'b0;
             joint_a_meta       <= 32'd0;
             joint_a_sync       <= 32'd0;
             joint_b_meta       <= 32'd0;
@@ -626,6 +733,12 @@ module lora_clg400_gpreg_bridge #(
                 joint_up_abort_sticky_sample
             };
             joint_sticky_sync <= joint_sticky_meta;
+            joint_straddle_meta <= joint_straddle_sticky_sample;
+            joint_straddle_sync <= joint_straddle_meta;
+            joint_split_meta <= joint_split_sticky_sample;
+            joint_split_sync <= joint_split_meta;
+            joint_early_meta <= joint_early_sticky_sample;
+            joint_early_sync <= joint_early_meta;
             joint_a_meta <= joint_correction_sample;
             joint_a_sync <= joint_a_meta;
             joint_b_meta <= joint_up_offset_sample;
@@ -662,6 +775,9 @@ module lora_clg400_gpreg_bridge #(
         gp_ctrl[0]
     };
     wire [31:0] timestamp_debug = debug_sync;
+    // The decision-history page wins over every other page; software that
+    // never sets bit 4 sees the existing ABI unchanged.
+    wire history_page_selected = gp_ctrl[4];
     wire joint_page_selected = gp_ctrl[18];
     wire symbol_page_selected =
         gp_ctrl[16] && !gp_ctrl[17] && !joint_page_selected;
@@ -671,10 +787,17 @@ module lora_clg400_gpreg_bridge #(
     // bit 2: down-search aborted at least once since stream_reset.
     // bit 3: an estimate was rejected as outside +/-FINE_GUARD_SAMPLES.
     // bit 4: a precise correction was actually applied to the grid.
-    // bits 31:5 are reserved, zero.
+    // bit 5: at least one packet was accepted only through the detector's
+    //        straddle-tolerant path (M7), sticky like bits 4:1.
+    // bit 6: ... only through its split-tolerant path (M9), sticky likewise.
+    // bit 7: ... only through its early-sync path, sticky likewise.
+    // bits 15:8 are reserved, zero.
     wire [31:0] joint_status = {
         16'h4a54, // "JT": joint estimator ABI marker
-        11'd0,
+        8'd0,
+        joint_early_sync,
+        joint_split_sync,
+        joint_straddle_sync,
         joint_sticky_sync,
         joint_seen_sync
     };
@@ -706,30 +829,50 @@ module lora_clg400_gpreg_bridge #(
         trace_captured_count_ctrl
     };
 
-    assign gp_status = joint_page_selected ? joint_status :
+    wire [31:0] history_status = {
+        16'h4448, // "DH": decision-history ABI marker
+        3'd0,
+        history_frozen_ctrl,
+        history_newest_ctrl
+    };
+
+    assign gp_status = history_page_selected ? history_status :
+        joint_page_selected ? joint_status :
         clock_page_selected ? clock_status :
         symbol_page_selected ? trace_status : timestamp_status;
     // Clocks between the last two accepted samples: sixty-three says the
     // receiver is on the fixed PL clock, one says it is back on the AD9361
     // divided data clock.
-    assign gp_sequence = joint_page_selected ? joint_a_sync :
+    assign gp_sequence = history_page_selected ? history_written_ctrl :
+        joint_page_selected ? joint_a_sync :
         clock_page_selected ? diag_interval_sync :
         symbol_page_selected ? trace_capture_sequence_ctrl : timestamp_sequence_ctrl;
     // Clocks the last joint search held the fabric, against a budget of
     // 2304 samples of SFD.
-    assign gp_coarse_lo = joint_page_selected ? joint_b_sync :
+    assign gp_coarse_lo = history_page_selected ? history_sample_count_ctrl :
+        joint_page_selected ? joint_b_sync :
         clock_page_selected ? diag_search_sync :
         symbol_page_selected ? trace_symbol_index_ctrl : timestamp_coarse_lo_ctrl;
-    assign gp_coarse_hi = joint_page_selected ? joint_c_sync :
+    assign gp_coarse_hi = history_page_selected ?
+        {history_flags_ctrl, history_drop_low_ctrl, history_confidence_ctrl} :
+        joint_page_selected ? joint_c_sync :
         clock_page_selected ? {17'd0, diag_misc_sync[30:16]} :
         symbol_page_selected ? trace_sample_count_ctrl[31:0] : timestamp_coarse_hi_ctrl;
-    assign gp_fractional_q12 = joint_page_selected ? joint_d_sync :
+    assign gp_fractional_q12 = history_page_selected ? {24'd0, history_bin_ctrl} :
+        joint_page_selected ? joint_d_sync :
         clock_page_selected ? {16'd0, diag_misc_sync[15:0]} :
         symbol_page_selected ? trace_sample_count_ctrl[63:32] : timestamp_fractional_ctrl;
-    assign gp_log_peak_q12 = joint_page_selected ? joint_e_sync :
+    // Samples the receive crossing has dropped since boot, live, on both the
+    // history and the clock page: read before and after an attempt, it says
+    // whether that attempt lost samples.
+    assign gp_log_peak_q12 = (history_page_selected || clock_page_selected) ?
+        {16'd0, drop_count_ctrl} :
+        joint_page_selected ? joint_e_sync :
         symbol_page_selected ?
         {8'd0, trace_flags_ctrl, trace_confidence_ctrl} : timestamp_log_peak_ctrl;
-    assign gp_debug = symbol_page_selected ? trace_debug : timestamp_debug;
+    assign gp_debug = history_page_selected ?
+        {4'd0, history_read_index_ctrl, 16'd0} :
+        symbol_page_selected ? trace_debug : timestamp_debug;
     assign gp_signature = SIGNATURE;
 
 endmodule

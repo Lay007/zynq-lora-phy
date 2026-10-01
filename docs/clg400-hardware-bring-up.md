@@ -34,10 +34,12 @@ it.
 
 ## Trusted baseline
 
-The board evidence lives in `G:\Programs\zynq-sdr-course-artifacts`. Before
-powering the stand:
+The board evidence (boot sets, bitstreams, routed reports and capture
+manifests) is kept in a separately maintained evidence archive with a
+manifest per item. Before powering the stand:
 
-1. Run `python verify_manifests.py` in that repository.
+1. Verify the archive's manifests (`python verify_manifests.py` in the
+   archive checkout).
 2. Preserve the known working board-B card. The manifest-backed recovery set is
    `boot-sets\board-b-course`; board B is documented at `192.168.20.1`.
 3. Keep the QSPI backups under `qspi-backups\board-a` and
@@ -66,7 +68,8 @@ generation with Windows PowerShell 5.1 as follows:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-  fpga\board\clg400\package_board_b_boot_set.ps1
+  fpga\board\clg400\package_board_b_boot_set.ps1 `
+  -BaselineDir $env:BOARD_BASELINE_DIR -KernelImage $env:BOARD_KERNEL_IMAGE
 ```
 
 It validates every inherited file and both new build artifacts against fixed
@@ -84,7 +87,7 @@ The archived `board-b-course` directory accidentally omitted `uImage`. The
 packager restores the byte-identical course kernel from the sibling course
 repository; its SHA-256 is
 `e675f26c955d76bccaacc14943619be44b45fcf06a52e9e6faebaada40f06f34`,
-which matches the original `G:\Programs\7020\course_sd_boardB\uImage`.
+which matches the original board image `course_sd_boardB/uImage`.
 Packaging changes no card, QSPI contents, or running board. The concise
 tracked record is
 [`docs/data/rtl-m4-clg400-board-boot-package.csv`](data/rtl-m4-clg400-board-boot-package.csv).

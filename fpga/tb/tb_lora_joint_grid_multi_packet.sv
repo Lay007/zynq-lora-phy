@@ -187,6 +187,36 @@ module tb_lora_joint_grid_multi_packet;
         end
     endtask
 
+    // A downchirp: the conjugate of symbol 0, for `count` samples (1024 for a
+    // full SFD symbol, 256 for the final quarter). The joint grid's down leg
+    // searches for it 10 symbols after the first preamble upchirp, so a
+    // stimulus without it gives the down search nothing physical to find and
+    // the packet timestamp (the joint (up + down) / 2 time) nothing to mean.
+    task automatic drive_css_downchirp(input integer count);
+        integer n;
+        integer source_n;
+        integer q_re;
+        integer q_im;
+        real phase_cycles;
+        real angle;
+        begin
+            for (n = 0; n < count; n = n + 1) begin
+                source_n = n;
+                phase_cycles = (0.5 * source_n * source_n) /
+                               (SYMBOL_COUNT * SAMPLES_PER_CHIP *
+                                SAMPLES_PER_CHIP) -
+                               (0.5 * source_n) / SAMPLES_PER_CHIP;
+                angle = 2.0 * PI * phase_cycles;
+                q_re = quantize_q10($cos(angle));
+                q_im = quantize_q10(-$sin(angle));
+                @(negedge clk);
+                iq_in_re <= q_re;
+                iq_in_im <= q_im;
+                valid_in <= 1'b1;
+            end
+        end
+    endtask
+
     task automatic drive_silence(input integer count);
         integer n;
         begin
@@ -206,10 +236,11 @@ module tb_lora_joint_grid_multi_packet;
             drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
             drive_css_symbol(0); drive_css_symbol(0);
             drive_css_symbol(8); drive_css_symbol(16);
-            // Past the SFD: exists only so the down search window arrives,
-            // same as tb_lora_joint_grid_completion.
+            // A real SFD for the joint grid's down leg, then header symbols
+            // so its window completes; same as tb_lora_joint_grid_completion.
+            drive_css_downchirp(1024); drive_css_downchirp(1024); drive_css_downchirp(256);
             drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
-            drive_css_symbol(0); drive_css_symbol(0); drive_css_symbol(0);
+            drive_css_symbol(0);
         end
     endtask
 

@@ -16,6 +16,13 @@ module lora_fft_detector_timestamp_path (
     input  wire               resync_valid,
     input  wire [31:0]        resync_skip,
     input  wire [7:0]         sync_word,
+    // Carrier-offset removal ahead of the correlator (see lora_cfo_derotator):
+    // cfo_load starts rotating by cfo_q12 (the joint estimate's displacement,
+    // Q12 samples); cfo_clear stops. Tie all three low to leave the sample
+    // stream untouched (it is then only delayed, bit for bit).
+    input  wire               cfo_load,
+    input  wire signed [31:0] cfo_q12,
+    input  wire               cfo_clear,
 
     output wire [31:0]        symbol_index,
     output wire               symbol_valid,
@@ -24,6 +31,9 @@ module lora_fft_detector_timestamp_path (
     output wire               timestamp_valid,
 
     output wire               detected,
+    output wire               straddle_detected,
+    output wire               split_detected,
+    output wire               early_sync_detected,
     output wire               preamble_detected,
     output wire               sync_valid,
     output wire [15:0]        preamble_bin,
@@ -43,15 +53,45 @@ module lora_fft_detector_timestamp_path (
     wire [15:0] spectrum_sum;
     wire symbol_boundary;
 
+    // The grid-resync skip is applied inside the generated correlator, so the
+    // request travels through the derotator's delay together with the samples
+    // and the correlator sees the same sample/request order as without it.
+    wire signed [15:0] rot_re;
+    wire signed [15:0] rot_im;
+    wire               rot_valid;
+    wire               rot_resync_valid;
+    wire [31:0]        rot_resync_skip;
+
+    lora_cfo_derotator u_cfo_derotator (
+        .clk(clk),
+        .resetn(resetn),
+        .in_re(iq_in_re),
+        .in_im(iq_in_im),
+        .in_valid(valid_in),
+        .in_resync_valid(resync_valid),
+        .in_resync_skip(resync_skip),
+        .in_stream_reset(reset_in),
+        .load(cfo_load),
+        .cfo_q12(cfo_q12),
+        .clear(cfo_clear),
+        .out_re(rot_re),
+        .out_im(rot_im),
+        .out_valid(rot_valid),
+        .out_resync_valid(rot_resync_valid),
+        .out_resync_skip(rot_resync_skip),
+        .out_stream_reset(),
+        .rotating()
+    );
+
     fft_correlator_route_top u_fft_correlator (
         .clk(clk),
         .reset(~resetn),
-        .iqIn_re(iq_in_re),
-        .iqIn_im(iq_in_im),
-        .validIn(valid_in),
+        .iqIn_re(rot_re),
+        .iqIn_im(rot_im),
+        .validIn(rot_valid),
         .resetIn(reset_in),
-        .resyncValid(resync_valid),
-        .resyncSkip(resync_skip),
+        .resyncValid(rot_resync_valid),
+        .resyncSkip(rot_resync_skip),
         .ce_out(fft_ce_out),
         .symbolIndex(symbol_index),
         .symbolValid(symbol_valid),
@@ -75,8 +115,12 @@ module lora_fft_detector_timestamp_path (
         .symbol_valid(symbol_valid),
         .symbol_sample_count(symbol_sample_count),
         .timestamp_valid(timestamp_valid),
+        .symbol_peak(peak_magnitude_squared),
         .sync_word(sync_word),
         .detected(detected),
+        .straddle_detected(straddle_detected),
+        .split_detected(split_detected),
+        .early_sync_detected(early_sync_detected),
         .preamble_detected(preamble_detected),
         .sync_valid(sync_valid),
         .preamble_bin(preamble_bin),

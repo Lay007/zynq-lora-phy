@@ -5,6 +5,8 @@
 ## Начать отсюда
 
 - [Архитектура системы](architecture.md)
+- [Руководство разработчика](development.md)
+- [Состав и граница репозитория](public_private_boundary.md)
 - [Дорожная карта и критерии готовности](roadmap.md)
 - [Аппаратный timestamping и синхронизация приёмников](hardware-timestamping.md)
 - [Завершённая приёмка floating-point MATLAB M1](matlab-m1-acceptance.md)
@@ -34,6 +36,7 @@
 - [Аппаратная серия Heltec V4.3/SX1262 → ZynqSDR от 3 августа 2026 года](hardware-sweep-2026-08-03-heltec-v43.md)
 - [Целевой прогон Heltec V4.3: SF5/SF6, BW500 и ToA от 7 августа 2026 года](hardware-targeted-2026-08-07.md)
 - [Аппаратная серия LR1121 → ZynqSDR от 2 августа 2026 года](hardware-sweep-2026-08-02.md)
+- [Кривые помехоустойчивости LoRa: схемы стенда и эксперимент](per-curves-experiment.md)
 - [Как вносить изменения](../../CONTRIBUTING.ru.md)
 
 Английские документы остаются первичными при расхождении версий. Русский набор

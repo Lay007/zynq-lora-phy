@@ -1541,3 +1541,1045 @@ including the ordering assertion in
 a new bitstream to hardware, and the follow-on ~50-60 attempt confirmatory
 run this fix's own plan calls for. That is a separate, separately-agreed
 step, same as every prior RTL change this project has shipped.
+
+## M6 on hardware: the timebase survives, M5's quality is unchanged -- 2026-09-19
+
+**Build and deployment.** Vivado 2021.1 rebuild of the M6 RTL: post-route
+WNS +0.021 ns / WHS +0.019 ns, TNS and THS 0, `write_bitstream` clean; the
+margin is thinner than M5's (+0.139 ns) but met. The first `build_bitstream.tcl`
+attempt hit the launcher hang the board README already describes -- synthesis
+wrote its report (`0 errors`) at 19:14 and then nothing: no `system_top.dcp`,
+no `impl_1`, three `vivado.exe` processes with flat CPU time for over two
+hours. With the user's go-ahead those three processes were stopped,
+`reset_stale_synth_run.tcl` returned `synth_1` from `synth_design ERROR` to
+`Not started`, and the rerun completed normally (no concurrent simulation
+load this time). Image SHA-256
+`86cf6b088d8fa1e7bad0b20b871f3d45eded14301f65dcbe921c4b7ecf5baec5`,
+2,546,340 bytes; the M5 image (`973e98ea...a719`) was backed up on the card as
+`system_top.bit.pre_m6_rearm_20260919T000000Z` and both hashes were verified
+before and after the atomic swap. After a cold boot the page-0 smoke test
+(`verify_board_b_cold_boot.sh`) read the same `status=0x00011243` as M5:
+the existing ABI is untouched.
+
+**Timebase.** A 50-attempt series in which only the first attempt pulses
+`stream_reset` and every later one pulses the new `trace_rearm`
+(`experiments/runs/2026-09-19-clg400-m6-rearm/`), 47 captured: the first
+trace entry's `sample_count` is strictly increasing across all 47 captures
+and spans 803.7 M samples over 803.7 s of the transmitter's own clock
+(`tx_start_ms`). A line fitted through (`tx_start_ms`, `sample_count`) has
+slope 1000.005 samples/ms and the worst residual is 0.51 ms, under one
+symbol (1.024 ms), which is what the per-packet grid re-alignment alone
+should contribute. The 5 ppm is the offset between the transmitter's
+millisecond clock and the receiver's sample clock together; it is not
+attributable to either. Before M6 every capture restarted this counter near
+zero.
+
+**M5's quality is unchanged.** 47/47 CRC pass on that series, and the
+`pl_grid_error_samples` ground-truth sweep gives `grid_err=0` on all 47.
+
+**Detection misses, and what this does not show.** Every failed attempt now
+leaves a record (`status: failed`, `stage`, `error`) and, when the recording
+finished, the IQ and its `burst_ratio`. All four failures across both series
+have `burst_ratio` in the thousands: the packet was in the recording and the
+PL did not detect it (`symbol trace is not complete: active=False,
+captured=0`). Counts at the same gain and bitstream: `trace_rearm` 3/50 (5/56
+with the 6-attempt probe), the control series with `stream_reset` before
+every attempt (`--full-rearm-every-attempt`, `m6-control/`) 1/50, and 6/90 in
+the two pre-M6 gain-25 series. None of these differences is significant
+(Fisher p = 0.21 against the control, 0.75 against pre-M6), so M6 neither
+introduced nor explains the misses -- but a roughly 7% rate of undetected,
+clearly present packets is a real, still-open defect of its own.
+
+**Still not done:** the 1000-packet campaign with separate per-stage
+counters, cable-delay calibration and the two-receiver work; the misses above
+are the first thing a longer campaign would need to explain.
+
+## M7: the ~7% of packets the detector never saw -- 2026-09-20
+
+M6 left one honest open item: about 7% of packets that are plainly in the
+recording (`burst_ratio` in the thousands) are never detected by the PL
+(`symbol trace is not complete: active=False, captured=0`), and the control
+arm showed it is not caused by `trace_rearm`. Everything below was done
+offline against the recordings already on disk; nothing here has run on
+hardware yet.
+
+**A first hypothesis, dropped by reading, not by testing.** The obvious
+suspect is a preamble bin sitting on the boundary between two FFT bins, the
+decision flipping between neighbours on noise and breaking the run of equal
+bins. `model/simulink/build_blind_detector_model.m` already accepts
+`BinTolerance = 1` on both the preamble run and the sync bins, so an
+adjacent-bin flip cannot make it miss. The same file's header comment names
+the real failure mode: on the free-running grid "the first sync symbol is
+skipped entirely and the run reads as one extra preamble bin followed by the
+second sync bin", and it measures the cost against offset in
+`RUN_BLIND_DETECTOR_REGRESSION`. The receiver top realigns its grid on
+`detected`, not on the preamble, so it has that caveat with no mitigation.
+
+**Reproducing it in the RTL.** A testbench (`fpga/tb/tb_replay_detect.sv`,
+driver `tools/replay_iq_through_rtl.py`) feeds a window of a recorded IQ file
+through `lora_packet_toa_receiver_top` -- the real FFT correlator and blind
+detector -- and prints every symbol decision. The packet's arrival phase
+against the receiver's symbol grid is what varies from packet to packet and
+cannot be recovered from the recording, so the window start is swept over a
+symbol. Five recordings (one detected on the board, the four missed ones), 32
+phases each: every recording behaves identically, detection at every phase
+except one narrow band. A finer sweep (step 8 samples) of the detected
+recording puts the band at 96 samples, 9.4% of a symbol. Pooling every gain-25
+attempt of this investigation (6/90 before M6, 5/56 with `trace_rearm`, 1/50
+control) the board saw 12/196 = 6.1% misses against 9.4% predicted, about 1.5
+sigma low and not inconsistent with it. The "missed" and the "detected"
+packets are the same kind of packet; the arrival phase decides.
+
+Inside the band the decisions are `[12 x P][P][P+16]` where the detector needs
+`[12 x P][P+8][P+16]`: the correlator window holds half of the last preamble
+symbol and half of the first sync symbol, the two peaks are comparable, and
+the larger one -- the preamble half -- wins. The second sync symbol is read
+correctly. The sync word cannot be seen again on this grid, so the packet is
+lost for good.
+
+**Fix 1: accept the pattern (`lora_detector_timestamp_path.v`).** A
+hand-written combinational path next to the generated detector, in the same
+cycle as `symbol_valid` because `lora_detector_timestamp_align` needs the
+decision on the matching timestamp cycle, accepts `[8 x ref][ref][ref +
+8*lowNibble]` with the same +/-1 bin tolerance and the same ten-symbol window.
+The two sync patterns differ in the ninth symbol by `8*highNibble` bins, so at
+most one can match; a sync word with highNibble 0 makes them identical and the
+path adds nothing. The generated HDL is untouched (the file's own rule). A
+Python model of both rules, checked against the RTL's own detections on all
+160 replay runs, agreed everywhere (0 mismatches), rescued all 13 misses and
+added no extra detection on any run that already detected. The new unit tests
+in `tb_lora_detector_timestamp_path.sv` (normal pattern, straddle pattern,
+wrap-around, +/-1 jitter, another sync word, four patterns that must not
+detect, reset clearing the history) fail on the old wrapper in exactly the six
+straddle-acceptance checks and pass on the new one.
+
+**Fix 2, found only by running the rest of the chain: the coarse origin.**
+Detection alone would have converted a lost packet into a silently corrupted
+one. In the band, `packet_start_count` still names the earlier decision window
+while `chips_to_boundary * 8` has already crossed 512, so
+`lora_joint_chirp_grid_controller.v`'s unwrap moves the origin back a whole
+symbol. The up leg cannot tell (every preamble upchirp looks alike); the down
+leg is pointed at the second sync symbol and its matched-filter peak is 6.5x
+weaker (peak/median 1.4, noise). Run through the RTL's own joint search with
+the flag ignored, k = 672/704/736 reported `precise=1`, no abort, no range
+error -- and `corr = -7` instead of `+1`, an 8-sample grid error, applied
+silently. Since M4/M5 established that one sample off kills the payload, that
+would have been a lost packet with a different label. The detector now raises
+`straddle_detected` in the cycle of `detected`; `lora_packet_toa_receiver_top`
+holds it beside `held_chips_to_boundary`; the controller does not unwrap a
+straddle-accepted packet. Ordinary detections keep the existing rule: on the
+board IQ it is right on both sides of the band (positive below chips 62, wrap
+from chips 74). The new controller test cases fail without the flag handling
+(start 59488 instead of 60512, exactly one symbol).
+
+**Full chain, board IQ, RTL joint search run to completion** (phases
+k = 640..752 step 16; the band is 656..744): `precise=1`, no abort, no range
+error, `corr = +1`, `up_off = -2` at every phase, and `up_coarse` grows by
+exactly the phase step (7648, 7664, ... 7760), including across the point where
+`packet_start_count` steps by one symbol. Detection at every phase: 64/64 (step
+16) on the detected recording and 16/16 in the band on each of two previously
+missed ones. The whole existing RTL regression set (detector, FFT detector,
+receiver top, AXI path, joint path x3, gpreg bridge, multi-packet, joint-grid
+completion at all five phases) and the Python suite (210) pass.
+
+**Diagnostics.** `joint_status` bit 5 (sticky like bits 4:1, cleared by
+`stream_reset` and `trace_rearm`) says at least one packet since the last
+re-arm was accepted only through the straddle path; `read_clg400_symbol_trace`
+reports it as `detector_straddle_accepted`. On the board this is per capture,
+so it shows directly which packets the fix rescued and whether they decode.
+
+**Not solved, deliberately.** On an ideal synthetic packet (no analog chain)
+the same replay still loses two of 64 phases at the switching point, with a
+different pattern: the first sync symbol read twice, `[12 x P][P+8][P+8][P+16]`.
+It does not occur in any board recording tried, and handling it needs the
+timestamp origin moved one decision back, which cannot be validated without
+data that shows it. It is recorded here, not handled. The same replay also
+puts the switch point for ideal signals near 480 samples of advance rather than
+the controller's 512, and near 588 on the board: the 512 the controller
+assumes is not where either flips, and the synthetic tests never exercised the
+difference. The straddle flag makes the board case right; it does not make the
+number universal.
+
+Timing: the added logic sits in front of `detected`, which fans out to the
+grid resync, the timestamp aligner and the trace buffer. The last build had
++0.021 ns of setup slack, so this may need attention in the rebuild.
+
+### M7 on hardware, first run: no misses, and 5 false detections I introduced -- 2026-09-20
+
+The M7 image (`a07c45f6...`, RTL `6d7552f`) was deployed by the usual atomic
+swap (M6 kept on the card as `system_top.bit.pre_m7_straddle_20260920T000000Z`)
+and cold-booted; the page-0 smoke test read the same `status=0x00011243` as
+every earlier image. A 6-attempt probe and then a 100-attempt series
+(`experiments/runs/2026-09-20-clg400-m7-verify/`, 25 dB, `trace_rearm`
+between attempts):
+
+- 99 of 100 captured. The one failure is at `prepare_transmitter`: the
+  transmitter's profile readback came back without its payload/length/running
+  fields over serial, before any packet was sent. Not a PL event.
+- **No detection miss at all** -- 0 of 99 attempts with the packet in the
+  recording and the trace empty, against 12 of 196 (6.1%) in the earlier
+  gain-25 runs. Twelve packets (12%, 9.4% predicted) were accepted only by
+  the new straddle path (joint status bit 5), all with `precise_correction_
+  applied`. The 87 packets that took the ordinary path decoded 87/87.
+- But only 7 of those 12 decoded. That is not the fix working "mostly": it is
+  two different populations.
+
+**Seven that decode.** `preamble_bin` 58, 63, 64, 64, 62, 64, 58 -- inside the
+band predicted from replay (55..66) -- `pl_grid_error_samples = 0` in every
+case, first trace entry exactly `packet_start_count + 10240` (ten symbols
+after the coarse origin, as for any packet), header and payload symbols
+identical to the ordinary ones. Their correction (-5..+11) is in the same
+range as the ordinary packets'. This is the mechanism M7 was built for, and it
+works.
+
+**Five that do not.** `preamble_bin = 0` in every one of them; the trace's
+first entry lies 4355 samples (four symbols) *before* `packet_start_count`;
+its first eight decisions are a constant preamble-like bin drifting 44..48; the
+ground-truth sweep gives `pl_grid_error_samples` of 7, -7, -5, 10, 4 with the
+first divergent stage at the dechirp. A trace that starts inside the preamble
+and a coarse origin that belongs to something else: the detector fired *early*.
+
+**Why my replays had not seen it.** They start from reset with about two
+symbols (2048 samples) of the recording before the burst, so the detector
+never has a run of silence. Replaying the failing recording with 20000 samples
+of real silence before the burst (`tools/replay_iq_through_rtl.py --lead
+20000`) reproduces it at one of eight phases: `DET` with P = 0, ctb = 0 at
+n = 23953, well before the real detection at n = 38529, from the decisions
+`[0 x 20][16, 16, 16, 47, 46, 46, ...]` -- twenty exact zeros, then the first
+window of the packet.
+
+Silence is bin 0, not random. With no signal the correlator's spectrum is
+exactly zero and its argmax is index 0. Measured on the recordings
+(`SYM ... conf= peak= sum=` printed by `tb_replay_detect.sv`): on every silent
+decision of a 25 dB recording and of two 50 dB ones (amplitude about 40),
+confidence, peak and spectrum sum are all exactly 0; on every decision of a
+real preamble or sync window peak is 12..67 (17..18 steady on the weak ones).
+A run of eight "equal" bins is therefore free in silence, and my rule
+`[8 x ref][ref][ref + 16]` then needs only one coincidence -- the first,
+partial window of the next packet landing on 16 +/- 1, 3 of 128 bins, about
+2.3% -- where the generated rule `[8 x ref][ref + 8][ref + 16]` needs two
+(about 0.05%). Observed: 5 of 99. When I wrote the rule I estimated its false
+rate as (3/128)^8 for eight random decisions; the decisions in silence are not
+random, and I did not test the one input a receiver sees most of the time.
+
+What a false detection does: it arms the symbol trace and the grid resync on
+the wrong instant (the trace begins in the preamble, so the header lies beyond
+the eight entry offsets the decoder tries), takes a coarse origin that is not
+a chirp start, and the joint search then reports a "successful" correction
+that is wrong (`precise=1`, no abort) -- the same silent corruption that the
+straddle flag prevents in the other direction.
+
+**Guard.** Two conditions on the straddle path
+(`lora_detector_timestamp_path.v`), both from data: (1) the correlator's peak
+is non-zero for all ten decisions of the window (silence is exactly zero,
+every real preamble/sync window is not, including the weak recordings), and
+(2) the reference bin lies in N/4..3N/4 (32..96), since the straddle needs the
+packet about half a symbol from the window and the bin measures exactly that
+(55..66 on the board, 58..64 among the rescued packets that decode); silence's
+bin 0 is far outside. `peak_magnitude_squared` from the correlator is wired
+into the wrapper as a new input. Seven new checks in
+`tb_lora_detector_timestamp_path.sv` (silence then 16, silence then 17, a
+bin-0 run with signal, one silent decision inside a straddle window, and the
+band edges 31/32/96/97) fail on the previous version and pass on this one; the
+two older tests whose reference bins lay outside the band (bin wrap at 120,
+sync word 0x34 at 10) were rewritten to in-band references with sync word
+0x34, where the second sync bin does wrap ((96 + 32) mod 128 = 0).
+
+**Replay check of the guard.** Failing recording (tx 246) with 20000 samples
+of silence in front, 8 arrival phases: exactly one `DET` per phase; the early
+false `DET` (P = 0, ctb = 0, n = 23953, alt rule at symbol 20) is gone. A good
+recording (`rx1-iq-20260919T195431Z`) with the same lead, shifts 96..208 step
+16: detected at all 8 phases, one symbol earlier (n = 37265) at shifts 96..192
+than at 208 (n = 38289). The `DET` line of the replay testbench now also prints
+the flag (`straddle=`, from `packet_straddle_detected`): the same 8 phases give
+straddle = 1 at shifts 112..192 (reference bin 66..56) and 0 at 96 and 208, where
+the generated detector copes on its own. So the straddle path still takes the
+band packets. Full RTL regression (fft
+detector, receiver top, AXI path, joint controller path x3, bridge, multi-packet,
+completion x5) and `pytest tests` (220) pass.
+
+### M7 guard image on hardware: misses 12/196 -> 2/301, false detections gone -- 2026-09-20
+
+The guard image (`eac45bda...`, RTL `43366d2`, WNS +0.025 ns / WHS +0.023 ns
+after post-route phys_opt, build 32 minutes without a launcher hang) was
+deployed by the same atomic swap (the first M7 image kept on the card as
+`system_top.bit.pre_m7_guard_20260920T000000Z`) and cold-booted; the page-0
+smoke test read `status=0x00011243` again. Runs, all at 25 dB with
+`trace_rearm` between attempts: a 6-attempt probe, a 100-attempt series and a
+200-attempt series (`experiments/runs/2026-09-20-clg400-m7g-*`).
+
+| | attempts | captured | detection misses | straddle-accepted | of which decoded |
+|---|---|---|---|---|---|
+| first M7 image | 100 | 99 | 0 | 12 | 7 (5 false detections) |
+| guard image | 306 | 301 | 2 | 17 | 17 (`pl_grid_error` 0) |
+
+The 5 attempts that did not capture: 3 on the transmitter side (one profile
+readback without fields, two `send` timeouts), 2 detection misses. Misses are
+now 2 of 301 recordings with a packet (0.7%), against 12 of 196 (6.1%) before
+M7. The false detections are gone: every packet accepted through the straddle
+path decodes with grid error 0.
+
+**The two remaining misses do not reproduce in RTL.** Tx 54 (normal signal
+level) and attempt 163 (`burst_ratio` 2412) replayed from reset with 20000
+samples of silence in front: detected at all 32 (tx 54, step 32) and all 16
+(attempt 163, step 64) arrival phases, two of the latter only through the
+straddle path. Neither packet lies unusually early in its recording (burst
+start 193512 and 192547 samples, against 188762..218996 for all 397 recordings
+of the M7 series), so the DMA start is not implicated. So the cause is state or
+stream the recording does not carry. For attempt 163 the failure record now has
+`pl_state`: the joint page saw no packet (`joint_seen` false) and the page-0
+sequence equals the trace sequence, i.e. the detector never fired; the
+clock-crossing flag is set on every capture and says nothing.
+`tools/read_clg400_symbol_trace.py` now raises `TraceNotComplete` carrying this
+state, because the sticky bits are cleared by the next attempt's re-arm and the
+evidence exists only at the moment of the failure. What would settle it is a
+ring of the detector's last decisions readable at the miss; not built.
+
+**1-sample grid errors follow the transmitter's CFO, not the level.** The probe
+and the first 100 captures after the cold boot have 6 ordinary-path packets with
+`pl_grid_error` 1 (CRC fails) out of 98; the next 197 have none (one weak
+recording, `burst_ratio` 1456, has a sweep best offset of -8 with a valid CRC,
+an ambiguity of the sweep). By 25-capture windows in time order the reference
+model's CFO displacement was -3.43, -3.39, -3.40, -3.40 samples (errors 3, 1, 0,
+2), then from about 16:16 UTC -3.20, -3.20, -3.18, -3.20, -3.22, -3.18, -3.17 (errors
+0 in each; the one flagged in that stretch is the sweep artefact above, CRC valid). The share of packets whose applied correction exceeds
+`up_offset` by 4 rather than 3 (which is (down - up)/2 rounding, not an error in
+itself: the M6 series have it at 18/47 and 13/49 with all grid errors 0) was
+24-52% in the first four windows and 12-28% in the later ones. Every one of the six errors has that
+difference of 4. Not amplitude: the same failing recording replayed through the RTL
+at x1, x0.5 and x0.25 gives an identical `corr`, `up_off` and `skip` at every phase.
+Not clipping: ADC peak 240 of 2048, no sample at the rail. Earlier series
+(M6 -3.1..-3.4, first M7 -2.9..-3.1) had none. A displacement of about 3.5 samples
+is 0.44 of a bin; a tone that close to the half-bin decision edge gives a
+one-sample grid shift (0.125 bin) room to change the decision, which would explain why
+only that CFO range shows it. This is a hypothesis fitted to the table above, not
+a measurement of the mechanism.
+
+### M7 guard image, 500-attempt series: 3 more misses, no grid errors, misses still not reproducible -- 2026-09-20/21
+
+A 500-attempt series on the same image, 25 dB, `trace_rearm` between attempts
+(`experiments/runs/2026-09-20-clg400-m7g-long500`, 17:52-20:18 UTC, 3 to 5.3
+hours after the cold boot; 500 was the disk limit, 15 GB free on the drive).
+
+492 of 500 captured; 5 attempts failed on the transmitter side (3 profile
+readbacks without fields, 2 `send` timeouts) and 3 were detection misses
+(attempts 113, 133 and 492, `burst_ratio` 64769, 54506 and 36662, so ordinary or
+strong signals). **CRC 492 of 492 and `pl_grid_error` 0 on every capture**: 463
+ordinary-path packets and 29 accepted through the straddle path.
+
+Pooled over the guard image (probe, 100, 200 and 500 series): 806 attempts, 793
+captured, 8 transmitter-side failures, **5 detection misses = 5 of 798 recordings
+with a packet (0.63%, 95% Wilson interval about 0.27..1.46%)**, against 12 of 196
+(6.1%) before M7. 46 packets accepted through the straddle path, all 46 decode
+(7 of 12 on the first M7 image).
+
+**Misses.** All three carry `pl_state`: `joint_seen` false and the page-0
+sequence equal to the trace sequence, the same as attempt 163: the detector never
+fired. Replayed from reset with 20000 samples of silence in front at 16 arrival
+phases (step 64), each is detected at every phase, two of them at one phase only
+through the straddle path. So five of five misses on the board do not reproduce
+from the recording alone. Nothing they share was found: the previous attempt of
+each was an ordinary, correct capture, the gap was 17-18 s, the burst started
+193124, 192667 and 191502 samples into the file (ranks 66%, 52% and 20% in the series). One coincidence noted and not
+supported by a mechanism: the low 32 bits of the absolute sample counter wrapped
+twice in this series (about 19:04 and 20:15 UTC); the packet 7.7 s after the first
+wrap was detected, and the miss at 20:15 lies about 4 s after the second. The
+counters on the detector's path are 64-bit (`lora_detector_timestamp_align`,
+receiver top), so nothing in it depends on the low word; with about six power-of-two
+boundaries to choose from after the fact this is not evidence.
+
+**Grid errors.** None in 492. Together with the earlier runs: 6 of 747 ordinary-path
+packets have a 1-sample grid error, all six among the 98 of the probe and the first
+series (first ~35 minutes after the cold boot), where the model CFO displacement was
+-3.57..-3.33. Split by the CFO displacement after the fact: below -3.38 samples 6 of
+83 packets have the error, at -3.38 and above 0 of 664 (25 of those lie between -3.38
+and -3.30). The 500-series CFO stayed within -3.35..-2.80 (window means -3.28..-2.92),
+so it never returned to the region where the errors occurred: the CFO hypothesis
+above is neither confirmed nor refuted by it. Two things this cannot separate: the
+threshold was chosen after looking (no p-value is quoted for that reason), and the
+CFO region coincides with the first ~35 minutes after the cold boot, so a board
+warm-up effect other than the CFO fits equally. Separating them needs the CFO
+region visited at a later time (a warm board with a detuned transmitter) or a cold
+boot repeated; or the synthetic test of the decode-best offset against CFO
+and fractional timing.
+
+## M8 diagnostics: decision history and a crossing drop count, for the misses -- 2026-09-24
+
+Five of 798 packets on the M7 guard image were never detected, and none of the
+five recordings reproduces the miss through the RTL at any replayed arrival
+phase. The recording is taken by the vendor DMA path; the receiver is fed
+through `lora_async_sample_fifo`, a separate branch. So whatever the detector
+saw differently is not in the recording, and a miss left nothing on the board
+beyond "the detector never fired" (the symbol trace only starts at a detection).
+
+**What the existing flag says.** `crossing_overflow` (clock page bit 0) was set
+on every capture of the M7 series. It is sticky until the PL reset, not until a
+stream reset, so it means "the receive crossing dropped at least one sample
+since boot", not "this capture": at least one drop did happen after the last
+cold boot, at an unknown time. The FIFO's own comment explains how the boot-time
+fill was removed; a later event (the profile restore changes the AD9361 rate)
+could set it once. Checked against the data already on disk: the PL's absolute
+sample counter against the transmitter's `tx_start_ms`, fitted per series,
+leaves residuals of about 300 samples, which is the 1 ms quantisation of the
+transmitter clock, with no step larger than 1032 samples and nothing unusual
+across any of the five misses. So no packet lost a millisecond or more of
+samples; a few samples, enough to break an eight-equal-bins preamble rule, would
+not show at that resolution.
+
+**What is added (RTL simulated, not yet built):**
+
+- `lora_async_sample_fifo` counts dropped samples (16-bit, saturating, Gray-coded
+  into the read domain). The bridge re-crosses it to the control domain and
+  reports it live on the clock page (METRICS) and on the new history page. Read
+  at every attempt, a change between two attempts puts a loss inside the later
+  one. `tb_lora_async_sample_fifo` checks the count is exact (writer outruns the
+  reader: 64 written, 36 crossed, count 28) and zero for the board's slow writer.
+- `lora_decision_history_buffer` (4096 x 72-bit ring, about 4.2 s of decisions):
+  every symbol decision, detected packet or not, with its sample-count low word,
+  bin, confidence, the drop count's low byte, and flags (valid, detected,
+  straddle, grid-resync armed; a detection or straddle pulse is held until the
+  next decision so it lands on an entry). gp_ctrl bit 3 freezes it, bit 4
+  selects its page (marker `0x4448` "DH"), bits 19-23 and 24-30 are the 12-bit
+  index. Software sees `frozen`, the newest index and the decisions written.
+  The bridge testbench checks writes, freeze (no writes while frozen), indexed
+  reads at 0, 5, 128 (needs index bit 19) and 129, the drop byte, the held
+  straddle flag, release, and that page 0 is untouched.
+- The recording command freezes the ring on the board the moment `iio_readdev`
+  returns, before the sentinel, because the packet is about 1.3 s before the
+  end of a 1.5 s recording and the trace read that follows would let the ring
+  overwrite it. Every arm releases the freeze. On a miss the capture tool reads
+  the ring (4096 entries, tens of seconds) into the failure record; every
+  record carries the drop count; `summarize_capture_run.py` reports the drop
+  increments and which misses have a history. Bits 3 and 4 are unused on older
+  images, so the tools stay compatible (no marker, no drop count).
+- `tools/compare_history_to_replay.py` finds the replayed phase whose decisions
+  best match the board's over the missed packet (from the first non-silent
+  decision after silence, since a silent correlator gives exactly zero
+  confidence) and prints both side by side with the first disagreement and
+  whether the drop count changed during the packet.
+
+What a miss on this image will show: either the drop byte changes inside the
+packet (samples lost in the crossing; the fix is upstream of the detector), or
+the board's bins differ from the replay's with no drop (the stream the PL saw
+differs from the recording some other way, or the detector state before the
+packet differs), or they agree and the rule still did not fire (a detector
+state the replay from reset does not have).
+
+### CFO hypothesis for the 1-sample grid errors: not supported by the model
+
+The M7 guard-image section left a hypothesis: the six 1-sample grid errors fell
+where the model CFO displacement was below -3.38 samples, and a tone that close
+to a half-bin edge might flip the joint estimator's rounding. Tested without the
+board, on synthetic up/down chirp pairs built as a continuous-time chirp at a
+fractional delay (the closed-form phase `reference_chirp` uses, evaluated at
+`n - delay`, not the integer `np.roll`), a CFO calibrated to give exactly the
+displacements measured on the board, and real receiver noise cut from a quiet
+stretch of a board recording at the guard series' amplitude (peak 240), through
+`estimate_joint_chirp_timing` with the geometry and radius the stage
+differential uses (up leg 6 symbols, down leg 14 symbols after the packet start,
+radius 32):
+
+| model CFO displacement | wrong rounding, noiseless, 401 fractions in (-0.5, 0.5) | wrong rounding, board noise, 2000 random fractions |
+|---|---|---|
+| -3.60 | 0 | 0 |
+| -3.50 | 0 | 0 |
+| -3.40 | 0 | 0 |
+| -3.38 | 0 | 0 |
+| -3.30 | 0 | 0 |
+| -3.20 | 0 | 0 |
+| -3.10 | 0 | 0 |
+| -3.00 | 0 | 1 |
+| -2.90 | 0 | 0 |
+| -2.80 | 0 | 1 |
+| 0 (none) | 2.0% (fractions within ~0.01 of +-0.5) | 26 (1.3%) |
+
+Nothing happens at -3.4: across the whole range the board visited, the float
+model rounds correctly. The only errors are at zero CFO, near the +-0.5 tie,
+where the up and down legs' parabolic-interpolation biases coincide and add
+instead of partly cancelling; the board never runs there. The model is floating
+point and the board is not, so the same question was put to the RTL.
+
+**The same question through the RTL.** Full synthetic packets (12 preamble
+upchirps, sync 8/16, 2.25 SFD downchirps, 8 payload symbols) delayed by
+base + f samples (f applied as an FFT phase ramp; the 1 MS/s stream is 8x
+oversampled for 125 kHz, so the band-limited shift is exact), the calibrated
+CFO, board noise, amplitude 240, through `tb_replay_detect` with the joint
+search run to completion; 2 integer phases x 5 CFO levels (0, -2.9, -3.2, -3.4,
+-3.6) x f in {0, 0.25, 0.375, 0.4375, 0.5, 0.5625, 0.625, 0.75}, 80 runs. The
+grid origin the RTL applies (up_coarse + correction - base) is 4096 for every
+f below 0.5 and 4097 for every f above it, at every CFO level and both phases:
+the rounding edge does not move with CFO within 1/16 sample. The only runs
+where the RTL and the float model differ are at f = 0.500 exactly (at -3.6 on
+both phases and -3.2 on one), the tie itself, where either integer is half a
+sample from the truth and neither is an error.
+
+So neither the model nor the RTL shows a CFO effect in the range the board
+visited. The six grid errors of the first 35 minutes after the cold boot are
+not explained by the CFO value; time since boot (a warm-up effect in the board
+or the transmitter that the CFO merely tracked) remains, and nothing measured
+so far separates candidates within it. The scripts are in the session
+scratchpad, not in `tools/` (`cfo_grid_error_synthetic.py`, `cfo_rtl_synth.py`).
+
+## The packet timestamp carried the carrier offset; the grid errors are a half-bin effect -- 2026-09-24
+
+Two offline investigations, no board.
+
+### 1. The six 1-sample grid errors, replayed at the board's own phase
+
+The earlier replays of these recordings used arbitrary arrival phases. The
+board's phase can be recovered: the detector's preamble bin moves by one per
+8 samples of replay shift, so the shift that reproduces the board's bin is
+known to within 8 samples, and all 8 (plus margin, 24 shifts per capture,
+144 runs) were replayed with the joint search run to completion
+(`tb_replay_detect`, guard-image RTL). For every capture one shift reproduces
+the board's preamble bin, `up_offset` **and** correction exactly. At that
+shift the RTL's correction agrees with the float model's
+(`estimate_joint_chirp_timing` on the same window and the same coarse starts,
+`up_coarse` and `up_coarse + 10*1024`, radius 16) in 5 of 6; in the sixth
+(`152702Z`) the model has timing +0.471 and rounds to 0, the RTL rounds to 1
+(a fixed-point difference within 0.03 sample of the tie). So the errors are
+deterministic in the signal, not a board state.
+
+What the six share: the residual left after the grid correction,
+`t - correction`, is -0.46..-0.53 sample in every one, always the same sign,
+while the CFO displacement was about -3.4. The dechirped tone therefore sits
+at S = displacement + residual = -3.89..-4.03 samples, and -4 samples is half
+a bin (8 samples per bin). Over all 929 ordinary-path captures with ground
+truth: of the 8 with S below -3.85, 6 fail CRC; of the 921 above, none. The
+link to "the first 35 minutes after a cold boot" is that only then was the CFO
+negative enough for a residual of about -0.5 to reach the edge.
+
+The previous section tested whether CFO flips the *rounding* of the grid
+correction and found it does not; that stands. The mechanism is downstream:
+the joint (up+down)/2 grid removes the timing but leaves the CFO in every
+decision, about -0.43 bin here, with 0.07 bin of margin to the half-bin edge.
+
+Remedies tested against the ground-truth sweep of all 981 captures (which grid
+offsets from the PL's decode every symbol):
+
+| grid | captures decoding every symbol |
+|---|---|
+| as built, joint (up+down)/2 | 921/928 ordinary path (974/981 all) |
+| constant +1 sample | 830/928 |
+| constant -1 sample | 6/928 (exactly the 6 failures) |
+| aligned to the up leg's peak | 0/981 |
+
+The good window is 1-3 samples wide and always includes the built grid except
+where S < -3.85, where it jumps to -1 alone. The idea that data upchirps are
+best demodulated on a grid aligned to the upchirp peak (time and frequency are
+interchangeable for a chirp) is refuted by these data. No grid-only rule fixes
+the six; removing the fractional carrier offset before the bin decision (the
+joint pair already estimates it: (up - down)/2) is the candidate, not built.
+
+### 2. The final ToA metadata was the up leg's peak, i.e. timing plus CFO
+
+The timestamp software receives (page 0: coarse sample count and Q12 fraction)
+came from the up leg's matched-filter peak alone (`u_metadata_join` in
+`lora_packet_toa_receiver_top`, fed by `peak_triplet_valid` and
+`toa_offset_valid && !reference_down`). An upchirp's matched-filter peak moves
+by the CFO displacement; the joint pair cancels it, but its result only
+steered the grid (#28 section 1 raised this as a hypothesis).
+
+- **On the board:** over 923 captures with a correct grid, the up leg's peak
+  sat -3.15 samples (mean) from the joint timing, and the reference model's
+  CFO displacement on the same packets averages -3.15 (difference 0.00 +/-
+  0.36, the integer quantisation). The board's timestamps were about 3 us late
+  or early by the transmitter's frequency, and drifted 0.8 us over the day as
+  it warmed (-2.8..-3.6 samples).
+- **Through the RTL, synthetic packets with known delay:** 5 CFO levels of both
+  signs x 4 fractional delays x 2 phases, board noise. Before: metadata error
+  = displacement to within 0.07 sample (-3.65..-3.59 at -3.6, +3.40..+3.45 at
+  +3.41; 0 +/- 0.006 at zero CFO). After the fix: within +/-0.043 sample at
+  every level and both signs; zero CFO unchanged.
+
+**Fix.** `lora_joint_chirp_grid_controller` outputs `toa_coarse` and
+`toa_fraction_q12`: the up leg's coarse start plus (up + down) / 2 (Q12 sum
+halved; 1/8192-sample truncation), split as the metadata ABI is, valid on
+`precise_correction_applied`. The receiver top feeds them to the metadata join
+in joint-grid builds (the legacy build is unchanged). Consequences: the
+timestamp now completes after the down leg rather than the up leg; a packet
+whose joint estimate aborts or is rejected gets no timestamp (an up-only value
+would carry the CFO error, and the joint page's sticky bits say what happened);
+`toa_log_peak_q12` is held from the up leg, because the down leg's
+interpolation now runs before the timestamp completes.
+
+**What the change exposed in the testbenches.** `tb_lora_joint_grid_completion`,
+`tb_lora_joint_grid_multi_packet` and `tb_lora_packet_toa_receiver_top` had no
+SFD: after the sync symbols they drove upchirps "only so the down search window
+arrives". The down leg locked onto an upchirp 14 samples off, and the grid they
+produced was 7 samples late (`fine_skip` 23 where 16 means zero correction) -- a
+fault the old timestamp check could not see because it read the up leg only.
+All three now drive a real SFD (2 + 0.25 downchirps, `drive_css_downchirp`),
+and `fine_skip` is 16 at zero phase. `tb_lora_packet_toa_receiver_top` asserts
+both legs exactly (33 + 33 correlations from 1008 and 11248, two
+interpolations, one timestamp at 1024). `tb_lora_joint_grid_completion` takes
+`+cfo_nano=N`: with +/-418000 (the board's -3.4-sample displacement and its
+mirror) the old RTL fails at +/-3 samples at both phases tried and the new one
+passes; CI runs both signs at all five phases. `tb_lora_joint_chirp_grid_controller`
+checks the new outputs, including a CFO-like pair (up peak 3.75 early, down
+2.875 late) where the up peak alone would give 10436.25 and the output is
+10440 - 1792/4096.
+
+Not built or deployed yet. It belongs in the next image together with the M8
+diagnostics.
+
+## M8 image on hardware: the CFO-free timestamp holds; CRC losses are the half-bin; misses leave evidence -- 2026-09-24
+
+Image `bac7c143...` (RTL `afdf52e`: M8 diagnostics plus the CFO-free timestamp;
+WNS +0.146 ns, WHS +0.030 ns) deployed by the usual atomic swap (the M7 guard
+image kept on the card as `system_top.bit.pre_m8_20260924T000000Z`), cold-booted,
+smoke test `status=0x00011243`. Runs at 25 dB, `trace_rearm` between attempts:
+a 6-attempt probe (5 captured, 5/5 CRC), a 78-attempt run stopped early to
+restart with a tool that records the page-0 timestamp
+(`2026-09-24-clg400-m8-partial`), and a 500-attempt series
+(`2026-09-24-clg400-m8-series500`, 16:40-19:11 UTC).
+
+**Series:** 500 attempts, 486 captured, 8 transmitter-side failures (1 profile
+readback, 6 `send` timeouts, 1 recording without a packet), 6 detection misses
+(1.2% of 492 packets), CRC 461 of 486 (95%), 29 packets accepted through the
+straddle path.
+
+**The timestamp is the joint time on the board.** Every capture now records
+page 0. Over all 486: published timestamp minus `up_coarse_start` minus the
+joint correction = +0.015 sample mean, within +/-0.5 (the fraction); minus
+`up_offset` instead = +3.39 mean (-4.2..+4.0), the CFO displacement. The page-0
+sequence equals the capture sequence in 486/486, so each timestamp belongs to
+its packet. On the previous images the published value was the up leg's peak.
+
+**All 25 CRC failures are the half-bin mechanism.** The transmitter's CFO
+displacement stayed at -3.30..-3.47 samples all series (windows of 50), the
+region where the M7 guard image had its only errors, and did not drift out of
+it as it did on 2026-09-20. Ground truth over the 486: with S = displacement +
+residual after the grid correction, 17 of 35 packets with S < -3.85 fail and 0
+of 95 in -3.7..-3.5; 20 of the 25 failures have S -4.07..-3.82 and the other 5
+have model timing within 0.034 sample of the +/-0.5 tie, where the RTL rounded
+the other way than the model, which puts their actual S at -3.91..-4.06. Losses
+from this mechanism (5% here) now exceed detection misses (1.2%): removing the
+fractional carrier offset before the bin decision is the next receiver change.
+
+**The receive crossing lost 1906 samples once, before the first attempt.** The
+new drop count read 1906 right after the cold boot and profile restore, did not
+move in 30 s of idle, did not move on a second profile restore, and did not move
+in any of the 584 attempts of the day. So the sticky `crossing_overflow` that was
+set on every M7 capture comes from one event between boot and the first read;
+the next cold boot should read the count before `restore_rx_profile.sh` to tell
+boot from the first profile restore. None of the misses lost samples in the
+crossing.
+
+**Misses: reproduced in the RTL, a narrow phase band my earlier replays aliased over.**
+All six misses of the series and the one of the partial run carry the detector's
+decision history, and the crossing drop count did not move in any of them. In each,
+the preamble decisions jump by 2 bins a few symbols before sync (51 x8 then 53, 53,
+53, 52, sync 60, 69), which breaks "eight preamble decisions within +/-1 of the
+oldest". Five of them were replayed through the RTL (`fix_tb`, 20000 samples of
+silence in front, detection only) at every 1-sample shift in a 24-sample window
+around the board's phase (found from the preamble bin, which moves one bin per 8
+samples of shift). **For all five, one shift reproduces the board's 16 decisions
+exactly (16/16), and at that shift the RTL does not detect the packet either.**
+
+| capture | board phase shift | blind shifts in the window |
+|---|---|---|
+| 163349Z | 223 | 215, 223, 231 |
+| 164405Z | 142 | 134, 142, 150 |
+| 164957Z | 239 | 231, 239, 247 |
+| 174127Z | 1022 | 6, 1014, 1022 |
+| 180856Z | 181 | 173, 181, 189 |
+
+The blind shifts recur every 8 samples, one chip: a fixed position inside the chip
+(residues 5, 6, 7 mod 8 here). Every earlier replay of the misses stepped the
+arrival phase by 32 or 64 samples, always a multiple of 8, so all of them sampled
+the same residue and never once the blind one. "Not reproducible from the
+recording", written for the M7 guard image's five misses and taken as evidence for
+a board-side cause (and the reason the M8 diagnostics were built), was an artefact
+of that sampling. The diagnostics did their job the other way round: the decision
+history made the exact phase known, and the replay then reproduced it.
+
+The mechanism is a relative of the half-bin: at that position inside the chip,
+together with the CFO, the preamble tone sits where the correlator's decision
+alternates between two values two bins apart. The fractional-CFO compensation
+proposed for the CRC losses is the natural fix for this too; widening the preamble
+tolerance to +/-2 would also cover it but would weaken the detector against noise
+and needs its false-detection rate measured on silence first.
+
+An operator error to record: while the first series ran, I read the board's
+registers from a second shell to check the new page-0 read. That script
+switches pages through the same control register the capture tool uses, so the
+read (and possibly the attempt then in flight) saw mixed pages; the series was
+stopped and restarted with the timestamp-recording tool, and the partial run's
+last record (`163943Z`, interrupted, no PL state) is not a miss.
+
+## M9: fractional-CFO removal before the bin decision, and split-preamble detection -- 2026-09-25
+
+Both remaining loss mechanisms of the M8 series come from the carrier offset
+left in the correlator's input, and both were reproduced in the RTL at the
+board's own phase before anything was changed.
+
+### Why the preamble peak splits (the detection misses)
+
+The correlator is a time-domain correlation with the reference chirp, decimated
+to one lag per chip (`fft_correlator_stages`: the two-FFT identity). On the
+free-running grid the window holds the tail of one preamble chirp and the head
+of the next. For the blind phase of miss `163349Z` the correlation profile of
+every preamble window has two nearly equal peaks at 51 and 53 with a trough at
+52 (0.27): the two parts arrive in antiphase and cancel at the true lag. The
+ratio of the two lobes creeps from 0.953 to 0.996 over nine symbols and then
+crosses, so the argmax jumps by two bins. Rotating the recording by the
+carrier offset (the model's joint estimate) makes the profile single-peaked in
+all five misses (second/first 0.35-0.75 instead of ~0.99) and the preamble
+decisions constant: the relative phase of the two parts is the carrier offset
+accumulated over a symbol.
+
+### Fix 1: remove the carrier offset after the joint estimate
+
+`lora_cfo_derotator` sits in front of the generated correlator, inside
+`lora_fft_detector_timestamp_path`. A 16-stage pipelined CORDIC (one sample per
+clock, no multipliers in the loop, maximum error 2 LSB at full scale in
+`tb_lora_cfo_derotator`) rotates each sample by a 32-bit phase accumulator
+advancing `cfo_q12 * 2^7` per sample. `cfo_q12` is the joint pair's own
+displacement (up - down)/2 in Q12 samples, a new controller output latched with
+the precise correction; a displacement d samples is a tone of -d/8192
+cycles/sample (the calibration used in the model experiments above). Rotation
+starts on `precise_correction_applied` and stops on the next `detected`, a
+re-arm or a stream reset, so the next preamble is searched on the raw stream as
+before, and the IQ history the joint search reads stays raw. The grid-resync
+request travels through the same 19-clock delay as the samples (the skip is
+applied inside the generated correlator, so its order with the samples must not
+change); the stream reset goes to the correlator directly and flushes the delay
+line. With rotation off the output is the input, bit for bit.
+
+Evidence:
+
+- Reference model, series `m8-series500`: with the IQ rotated by each packet's
+  joint CFO, 25 of 25 CRC failures decode on the grid the board used and 50 of
+  50 random controls still do; the window of grid offsets that decode every
+  symbol widens from 1-3 to 7-8 samples.
+- RTL on board recordings at the board's phase, with the board's sample rate
+  (`tb_replay_detect +gap_det=63`: one sample per 63 clocks from the detection
+  until the joint result, where the ratio matters; one per clock elsewhere).
+  The phase was pinned for 7 of the 14 recordings tried (a two-run method: the
+  preamble bin gives the phase to 8 samples, the joint `up_offset` the rest;
+  for the other 7 it did not converge and they are left out). The old RTL
+  reproduces the board's failure on all 4 failures pinned, the new one decodes
+  all 4; the 3 controls decode on both.
+
+### Fix 2: accept the split preamble
+
+Before detection the carrier offset is not known, so the detector has to
+tolerate the split. `lora_detector_timestamp_path` gains a third path next to
+the generated rule and the M7 straddle path: eight preamble decisions within
++/-2 of the oldest, the first sync decision within +/-2 of ref + 8*highNibble
+(or, in the straddle form, of ref itself), the second within +/-2 of
+ref + 8*lowNibble. The straddle form was needed: two of the five misses had
+both the split and the straddle (the first sync symbol read as one more
+preamble bin), and it raises `straddle_detected` too so the controller does not
+unwrap the coarse origin. Guards as for M7 (every decision of the window from a
+correlator that saw a signal; reference bin in N/4..3N/4). The path reports its
+own preamble bin, the centre of the two lobes, and chips_to_boundary = N - bin,
+because the generated detector's tracking restarted at the jump. It cannot fire
+on an ordinary packet a symbol early or late (at sync1 the sync1 check fails, a
+symbol later sync1 is inside the preamble run), and never where the generated
+rule or the straddle path fired. A new sticky bit 6 on the joint page
+(`detector_split_accepted`) counts it on the board.
+
+Evidence: unit tests with the board's own decision sequences (`163349Z`
+ordinary form, `180856Z` and `164405Z` straddle form) plus a 3-bin spread,
+silence and an out-of-band reference, all as expected; the existing detector
+tests unchanged. RTL on the five miss recordings at their blind phases, 20000
+samples of silence in front, `+gap_det=63`: the old RTL detects none, the new
+one detects all five (three ordinary, two straddle form; preamble bins 52, 62,
+50, 79, 56 = the lobe centres) and every one decodes with a valid CRC.
+
+(A unit test first asserted that "silence, then 8, 16" is not detected; it is --
+by the generated rule, whose own pattern that is with reference 0, the known
+two-coincidences-after-silence weakness. The test now asserts only the split
+path's refusal.)
+
+Regression: fft detector, receiver top, AXI path, joint path x3, bridge (bit 6),
+multi-packet, completion x5 plus two with CFO, controller, derotator, detector,
+FIFO; 242 Python tests. Not built or deployed yet.
+
+### M9 build 1 failed timing; CI found an early-sync miss -- 2026-09-25
+
+The first M9 build missed timing by 0.056 ns (WNS) on one path: interpolator
+`quotientReg` -> joint controller `toa_fraction_q12` CE, 46 logic levels (36
+carry chains). Since the M8 timestamp fix the (up + down)/2 sum, its rounding,
+the range check and now the CFO difference were all computed in the cycle the
+down leg's interpolator result arrives. The controller now registers the down
+leg's refinement (`STATE_WAIT_DOWN_FRAC`), the sum and difference
+(`STATE_SUM`), and rounds, range-checks and latches in `STATE_DECIDE`: the
+estimate arrives two clocks later (135519 -> 135521 cycles after detection in
+`tb_lora_joint_chirp_grid_path`); a sample takes 63.
+
+CI had been red since `afdf52e` on one job: `tb_lora_joint_grid_completion`
+at grid_phase 512 with CFO +/-0.000418 cycles/sample found no packet (only the
+two CFO signs at this phase; all other 13 combinations passed). Grid phase 512
+is exactly half a symbol: every window holds half of two chirps, and the one
+holding the last preamble chirp and the first sync chirp is a tie. At CFO 0 it
+went to the preamble (decisions 64 x8, 72, 80 -- the generated rule fires);
+with the offset it went to the sync (64 x7, 72, 72, 81): one preamble decision
+short, and neither the straddle path (the mirror case: first sync read as
+preamble) nor the split path accepted it. I had run the CFO cases locally only
+at phases 0 and 700.
+
+`lora_detector_timestamp_path` gains an early-sync path:
+[7 x (ref +/-1)][s1 +/-1][s1 +/-1][s2 +/-1], guards as the straddle path. Its
+windows are the generated rule's own (the tie window is the one it counts as
+the eighth preamble decision), so it fires on the same symbol with the same
+preamble bin and chips_to_boundary = N - ref, and raises no straddle flag.
+New sticky bit 7 on the joint page (`detector_early_sync_accepted`,
+`early_sync_accepted` in the run summary). Not seen on the board so far: all
+M8 misses were the split.
+
+Regression: every CI RTL step run locally (the smoke job's 20 testbenches, the
+completion matrix 5 phases x 3 CFO values, multi-packet), 242 Python tests.
+
+## M9 on the board -- 2026-09-25
+
+Image `94aee611...` (source `92d5241`: CFO derotation, split-preamble and
+early-sync detection, the two-stage joint controller), deployed by the operator
+over the M8 image (backup `system_top.bit.pre_m9_20260925T000000Z`), cold boot,
+`GAIN=25 restore_rx_profile.sh`, cold-boot smoke PASS. Same link as M8: Heltec
+V4/SX1262 -> CLG400, ~1 m over the air, 868.1 MHz, trace_rearm between attempts.
+
+**Crossing drops happen at boot.** The drop count read straight after the cold
+boot, before `restore_rx_profile.sh`, was already 1901 (0x76D); it did not move
+through the profile restore or the whole series. The 1906 of the M8 day was the
+same boot-time event; the receive path drops nothing while it runs.
+
+**Series `2026-09-25-clg400-m9-series500`** (17:26-20:35 UTC, archived with its manifest in the
+board-evidence archive):
+
+| | M8 series500 (2026-09-24) | M9 series500 |
+|---|---|---|
+| attempts / captured | 500 / 486 | 500 / 492 |
+| CRC valid | 461 / 486 (94.9 %) | **492 / 492 (100 %)** |
+| detection misses | 6 | **0** |
+| failures outside the receiver | 8 | 8 (prepare_transmitter 3, send 4, one recording without a packet, peak-to-median 1.8) |
+| straddle path | -- | 26, all CRC valid |
+| split path | -- | 2, both CRC valid |
+| early-sync path | -- | 0 |
+| timestamp residual | +0.015 mean, within +/-0.5, sd 0.291 | +0.001 mean, within +/-0.5, sd 0.285 |
+| CFO displacement (up - joint) | -3.38 mean | -3.64 mean |
+
+The timestamp residual is page-0 time minus `up_coarse_start` minus the joint
+correction; its spread is the rounding of the integer correction (a uniform
++/-0.5 has sd 0.289), so the derotation did not move the published time.
+Both mechanisms found on the M8 day are gone on the hardware: no CRC failure at
+all (the half-bin mechanism), and no miss (the split preamble; two packets went
+through the split path and decoded).
+
+`up_coarse_start` on the joint page is the low 32 bits of the sample count; the
+counter passes 2^32 every 71.6 min at 1 MS/s, so in a 3-hour series about half
+the records differ from the 64-bit `page0_coarse` by 2^32 or 2^33 exactly. The
+residual above is taken modulo 2^32; the reader now says so.
+
+An overnight series with `--keep-iq anomalies` (new: the recording of an
+ordinary decoded packet is deleted after its record is written; failures,
+CRC failures and every rescue path keep theirs) was started at 21:09 UTC, 1400
+attempts, to put numbers on the rare paths.
+
+**Overnight series `2026-09-26-clg400-m9-overnight`** (1400 planned, from 21:09
+UTC): the host disk filled at about attempt 243 (22:40 UTC; not by the series,
+which used ~25 MB with `--keep-iq anomalies`), and every attempt after it failed
+with `ENOSPC`. Before that: 240 captured, CRC 240/240, 0 misses; split path 1
+(CRC valid), early-sync 0, straddle 10; 4 transmitter-side failures and one IQ
+file truncated as the disk filled. No crossing drop.
+
+Together with series500: **0 misses in 732 packets**, CRC 732/732. Wilson 95 %
+upper bound 0.52 % (M7 had 5/798 = 0.63 %); Fisher exact, one-sided, against
+M8 (6/492) p = 0.004, against M7 p = 0.04. Issue #31 closed. The early-sync
+path has not fired on the board yet.
+
+## M9: detection misses come back on a weak signal -- 2026-09-26/27
+
+**Day series `2026-09-26-clg400-m9-day1400`** (06:33-13:40 UTC, 1400
+attempts, `--keep-iq anomalies`): 1381 captured, CRC 1377/1381, **7 detection
+misses**, 1 recording without a packet, 11 transmitter-side failures. Rescue
+paths: straddle 64, split 23, **early-sync 4** (its first firings on the board),
+all CRC valid. No crossing drop.
+
+A miss here is a `read_trace` failure with `captured=0`, the joint page empty,
+and page 0 still holding the *previous* packet (its coarse time and sequence
+number): the programmable logic never detected this attempt's packet. At first
+I read the ring's one `detected` entry as this packet's; ordering the ring by
+sample count (the write pointer, not `newest_index`, is where the counts jump
+back) puts it before the attempt's own re-arm, i.e. it is the previous packet.
+
+**The signal dropped ~10 dB overnight; nothing on the bench moved.** Noise
+power of the recordings is identical in all three series (0.82 LSB^2); the
+packet's power fell from 38-40 dB to 28 dB above it. At night (21:10-22:40
+UTC) the burst ratio stayed at 6600-6700 within a few percent; through the day
+it moved in steps between flat plateaus (530-590 for 30 minutes, then
+1300-1700, then 12500 at 10:30 UTC): indoor multipath with people in the room.
+The receive configuration read back unchanged (25 dB manual, LO 868.1 MHz);
+the transmit profile is byte-identical.
+
+| Burst ratio | captured | misses | CRC fail |
+|---|---|---|---|
+| < 300 | 28 | 7 | 1 |
+| 300-1000 | 371 | 1 | 0 |
+| 1000-3000 | 318 | 0 | 2 |
+| >= 3000 | 664 | 0 | 1 |
+
+**Mechanism.** The packet peak of the missed recordings is 9-16 LSB of 2047
+(the day's good ones 23-54, the evening's 57-169). The decision ring shows the
+preamble with holes: `29 x6, ., 29 x4`, `100 x11, ., 108, 116` -- windows with
+confidence 0 in the middle of the packet. The correlator's
+`peakMagnitudeSquared` is a 16-bit quantity scaled for strong input; where a
+window holds a split peak or straddles two chirps each lobe carries about a
+quarter of the power, and at this level it truncates to exactly zero. The
+decision becomes bin 0 and breaks the run, and the M7 silence guard (every
+window's peak non-zero) refuses the rescue paths too. The radio link itself is
+fine: 28 dB SNR at worst, where SF7 decodes at -7 dB.
+
+RTL replay of six misses (M9 RTL, 28 phases, step 37): 3 detected at no phase,
+the others at 2-13 of 28. The same recordings scaled x16 are detected at all 28
+phases, x4 at all 15 phases tried; three strong recordings of 2026-09-25 scaled
+x16 are detected at every phase (no overflow). The seventh miss (080352Z) has
+no preamble in the recording at all: the burst is 42 ms instead of ~77 ms and
+starts with payload symbols (dechirped bins wander 0..4, 121..127): a fade over
+the preamble, not a receiver fault.
+
+The four CRC failures: three do not decode with the reference model at any
+grid correction either (072121Z agrees with the model on only 9 of 24 raw bins;
+083257Z is at burst ratio 118); one (101022Z) decodes with the model at -3
+while the PL applied -1, a joint-estimate error of 2 samples.
+
+**Gain experiment on the board.** RX gain set live (sysfs, manual, both
+channels). A first pair at 11 and 23 dB (300 attempts each, evening) gave 0
+misses in both: the evening signal was ~22 dB stronger than the weak day
+periods (peak 33-48 LSB at 11 dB). The decisive run interleaved 12 blocks of 25
+attempts at **0 dB** (peak 9-14 LSB, the level of the day misses) and **12
+dB**, so a change in the room hits both arms alike:
+
+| | 0 dB | 12 dB |
+|---|---|---|
+| packets on air | 295 | 298 |
+| detection misses | **194 (66 %)** | **0** |
+| CRC of captured | 101/101 | 298/298 |
+
+By packet peak: 9-11 LSB 5 of 5 missed, 12-14 LSB 189 of 193 missed, 30 LSB
+and more none missed. The receiver needs about 20 LSB of packet peak.
+
+**Consequences.** (1) At 25 dB this bench swings from ~15 to ~190 LSB within a
+day, and at 50 dB it clipped at the rail (2026-09-19): analog gain alone leaves
+too narrow a window. (2) Short term: 37 dB puts the weakest daytime packet at
+~60 LSB and the strongest seen at 25 dB (219) at ~870, both inside range.
+(3) The fix belongs in the PL: a digital gain of x16 in front of the
+correlator costs nothing in range (12-bit ADC into a 16-bit input:
+2047 x 16 = 32752) and removed every replayed miss. The gain was returned to
+25 dB after the runs.
+
+### The correlator's working window, and why M10 is not a digital gain -- 2026-09-27
+
+The plan was M10 = a x16 left shift (with saturation) in front of the detector
+correlator. Two things killed it before a build:
+
+- **The local CI failed with it.** The testbenches drive amplitude 1024; x16
+  gives 16384, and the completion testbench found no packet at 4 of 5 phases
+  (`packet starts=0`). The M10 RTL did detect all six raw weak misses at all 15
+  phases tried, with the joint estimate applied (`precise=1`).
+- **The window has a ceiling as well as a floor.** A strong recording of
+  2026-09-25 (raw peak 169) scaled to peaks of 1200/2400/4800/9600/15000/24000
+  through the M9 RTL, 7 phases each: detected at 7/7, 7/7, 7/7, 6/7, 4/7, 4/7.
+  With the floor at ~20 LSB the generated correlator works from about **20 to
+  5000 input LSB, ~48 dB**.
+
+The reason is in the generated types (`model/simulink/+lora_sim/fixed_point_types.m`):
+every boundary is 16 bits with one guard bit over the measured range of the
+golden vectors, Floor rounding, Saturate on overflow. The input is
+`sfix16_En10` -- the model's unit amplitude is 1024 LSB, which is what the
+testbenches drive -- and `magnitudeSquared` is `ufix16_E5`. The board's packets
+at 25 dB were 9..220 LSB: the receiver had been running at the bottom of its
+window all along.
+
+So a gain in the PL only moves the signal inside the same window; so does the
+AD9361 gain, and at 25 dB the AD9361's noise (~0.9 LSB rms) already exceeds the
+ADC's quantization noise, so the digital shift buys nothing the analog gain
+does not. x16 would have pushed today's 37 dB packets (up to 680 LSB) to 10880,
+over the ceiling. **Operating point: 37 dB** (packets 36..880 LSB on this bench,
+inside the window at both ends); `restore_rx_profile.sh` now defaults to 37
+(was 50). The M10 change was reverted and never committed. Widening the window
+itself means regenerating the correlator with wider `magnitudeSquared`,
+spectrum sum and confidence (MATLAB R2025a with HDL Coder is installed).
+
+**Series `2026-09-27-clg400-m9-gain37`** (37 dB, 06:16-13:12 UTC, 1400
+attempts): 1389 captured, **0 detection misses**, CRC 1379/1389; straddle 77
+(CRC 73/77), split 5, early-sync 1; 3 recordings without a packet (send
+timing), 8 transmitter-side failures; no crossing drop. Packet peaks 520..680
+LSB, none at the ADC rail.
+
+**CRC failures are a separate mechanism**, ~0.4 % over all M9 series. They do
+not follow the level: the joint triplet's log2 peak is 27.9..28.4 for the
+failures against a median of 28.2 for the good ones (saturation at 32). With
+the reference model derotated by the joint CFO (as M9 does), 3 of the 12
+examined decode: 083257Z on the board's grid (it is a weak packet, 118 burst
+ratio: truncated payload windows), 081344Z and 101022Z only 1..6 samples off
+the board's grid (a joint-estimate error). The other nine decode at no grid
+offset even derotated. At 37 dB the straddle path is over-represented: 4 of
+its 77 packets failed against 6 of the other 1312.
+
+## M10: the correlator regenerated at WordLength 20 (#32) -- 2026-09-27/28
+
+**Why the window was where it was.** `run_fixed_point_sweep` chose 16 bits in
+M2 by driving the golden vectors at one level, and `run_real_iq_regression`
+normalises every window to unit RMS before replaying it: neither ever varied
+the input level, so the dynamic range was never measured. The integer bits come
+from range analysis (plus one guard bit), the word length only adds fraction
+bits -- so more word length lowers the floor and leaves the ceiling alone.
+
+**Regeneration.** `run_hdl_generation(WordLength=20)` (MATLAB R2025a, HDL Coder,
+~8 min; now the default). Ports become `sfix20_En14` in, `ufix20_*` out;
+`fft_correlator_route_top` keeps the 16-bit sample port (a raw sample enters as
+`{x, 4'b0}`, the same value) and returns confidence and spectrum sum at their
+old scale (top 16 bits); the peak keeps "zero means exactly zero" (a peak the
+16-bit core would have truncated reads 1).
+
+RTL replay (7 phases each, `--no-joint`):
+
+| input peak (LSB) | 5 | 10 | 20 | 40 | 1200..4800 | 9600 | 15000 | 24000 |
+|---|---|---|---|---|---|---|---|---|
+| 16-bit core | 0/7 | 1/7 | 7/7 | 7/7 | 7/7 | 6/7 | 4/7 | 4/7 |
+| 20-bit core | **7/7** | **7/7** | 7/7 | 7/7 | 7/7 | 6/7 | 4/7 | 4/7 |
+
+The six weak board misses of 2026-09-26 are detected at every phase on the raw
+recordings. Noise-only board recordings (pre-burst noise at 25 and 37 dB, 4 x
+250k samples each): 0 detections on either core -- the M7 silence guard stayed
+harmless although noise no longer truncates to exactly zero.
+
+**Timing.** The first 20-bit build missed by 0.446 ns (77 endpoints), both paths
+inside the core and both the ones that had been thin at 16 bits (+0.002..0.025
+ns): FFT_N -> ScaleByM -> MagnitudeSquared -> Confidence divisor (28 levels, 17
+carry chains) and resetIn -> Multiply -> AccumDelay. `run_hdl_generation` now
+sets output pipelines on Multiply (1), ScaleByM (1), MagnitudeSquared (2) and
+GuardedSum (1) -- outside the AccumSum/AccumDelay and SpectrumSum/SpectrumDelay
+loops, so the function is unchanged and HDL Coder balances the parallel paths;
+core latency 42 -> 47. Result: **WNS +0.220 ns**, the best margin of the
+project (M9 +0.018), worst path now inside axi_ad9361; LUT 39154 (73.6 %), DSP
+102, BRAM 86. The pipelined core replays identically (5/10/4800 at 7/7, 9600 at
+6/7, the weak misses at 7/7). CI (smoke 20 testbenches, completion 5 phases x
+CFO 0/+-, multi-packet) all pass. Commit `b054731`, image `27f50b0b...`
+(bitstreams/lora-clg400-m10-wide-correlator).
+
+The ci_local runner's joint-grid jobs hung twice with no simulator process
+left (once across a sleep, once not); running each `vvp` of those jobs directly
+from a compiled binary completed normally -- a runner problem, not a design one.
+
+**On the board.** Deployed by the operator, loaded by a software `reboot`
+(u-boot loads `system_top.bit` from the SD card on every boot, so no power
+cycle is needed), profile restored at the new default 37 dB, smoke PASS; drop
+count 1883 after boot, unchanged by the profile restore. Probe at 37 dB: 9/9
+CRC valid. The decisive repeat of the M9 experiment -- 12 blocks of 25
+attempts, 0 dB and 12 dB interleaved, 300 attempts each (runs
+`2026-09-28-clg400-m10-ab-gain0/12`):
+
+| | M9, 0 dB | **M10, 0 dB** | M10, 12 dB |
+|---|---|---|---|
+| packets on air | 295 | 295 | 298 |
+| detection misses | 194 (66 %) | **0** | 0 |
+| CRC of captured | 101/101 | **295/295** | 298/298 |
+| packet peak (median, kept IQ) | 12 LSB | 11 LSB | 40 LSB |
+
+Rescue paths in the M10 experiment: straddle 11 + 12, split 4 + 1, early-sync
+0, all CRC valid; 2 recordings without a packet (send timing) and 5
+transmitter-side failures; no crossing drop. Issue #32 closed.
