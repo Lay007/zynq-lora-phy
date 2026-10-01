@@ -179,6 +179,7 @@ module lora_joint_chirp_grid_controller #(
     // tell, because every preamble upchirp looks alike.
     wire coarse_wraps = !packet_straddle
         && ((packet_early_sync === 1'b1) ||
+            packet_epoch_ambiguous ||
             (coarse_chip_advance >= (SYMBOL_SAMPLES_U64 / 2)));
     // Near half a symbol, quantized FFT bins can select a candidate one
     // symbol early. Qualify its SFD against the interior upchirp and retry
