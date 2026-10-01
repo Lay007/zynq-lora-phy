@@ -7,7 +7,7 @@ sample-grid refinement remain receiver-front-end responsibilities.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable, Sequence
 
 
@@ -550,6 +550,7 @@ def decode_lora_symbol_trace(
     spreading_factor: int = 7,
     symbol_offsets: Iterable[int] = range(0, 9),
     bin_adjustments: Iterable[int] | None = None,
+    require_payload_crc: bool = False,
 ) -> LoRaTraceDecode:
     """Search the bounded CLG400 trace for a CRC-valid explicit-header packet.
 
@@ -558,6 +559,8 @@ def decode_lora_symbol_trace(
     :func:`quarter_symbol_bin_adjustments` hypotheses, then scans the few
     plausible SFD-to-header offsets.  CRC success dominates header-only
     candidates; lower aggregate hard-decision distance breaks ties.
+    Set ``require_payload_crc`` for a receiver profile that requires payload
+    CRC: unprotected candidates then cannot displace a protected success.
 
     Every hypothesis is decoded before choosing. Returning the first CRC
     success let a neighbouring bin adjustment win whenever it happened to
@@ -581,6 +584,9 @@ def decode_lora_symbol_trace(
             result = decode_lora_packet(
                 normalized[offset:], spreading_factor=spreading_factor
             )
+            if require_payload_crc and result.header is not None and not result.header.payload_crc:
+                result = replace(result, success=False, crc_valid=False,
+                                 failure_reason="payload CRC required")
             candidates.append(
                 LoRaTraceDecode(result, offset, adjustment, normalized)
             )

@@ -54,6 +54,24 @@ def test_python_hard_decoder_matches_matlab_golden_vector() -> None:
     assert decoded.consumed_symbol_count == len(vector["cssSymbols"])
 
 
+def test_required_crc_filters_candidates_before_ranking() -> None:
+    from zynq_lora_phy import encode_lora_packet
+    unprotected = encode_lora_packet(b'ZLP1-unprotected', payload_crc_present=False).symbols
+    protected = encode_lora_packet(b'ZLP1-protected', payload_crc_present=True).symbols
+    raw = unprotected + protected
+    options = dict(symbol_offsets=(0, len(unprotected)), bin_adjustments=(0,))
+    ordinary = decode_lora_symbol_trace(raw, 0, **options)
+    assert ordinary.result.success and not ordinary.result.header.payload_crc
+    required = decode_lora_symbol_trace(raw, 0, require_payload_crc=True, **options)
+    assert required.result.success and required.result.header.payload_crc
+    assert required.result.payload == b'ZLP1-protected'
+    assert required.symbol_offset == len(unprotected)
+    rejected = decode_lora_symbol_trace(unprotected, 0, require_payload_crc=True,
+                                        symbol_offsets=(0,), bin_adjustments=(0,))
+    assert not rejected.result.success and not rejected.result.crc_valid
+    assert rejected.result.failure_reason == 'payload CRC required'
+
+
 def test_whitening_and_crc_match_matlab_golden_vector() -> None:
     vector = json.loads(GOLDEN.read_text(encoding="utf-8"))
     payload = bytes(vector["payload"])

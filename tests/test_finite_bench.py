@@ -27,7 +27,7 @@ def line(**overrides):
 
 @pytest.fixture
 def decode(monkeypatch):
-    monkeypatch.setattr(bench, 'decode_lora_symbol_trace', lambda *a: SimpleNamespace(
+    monkeypatch.setattr(bench, 'decode_lora_symbol_trace', lambda *a, **kw: SimpleNamespace(
         result=SimpleNamespace(crc_valid=True, header=SimpleNamespace(payload_crc=True),
                                payload=b'ZLP1'+(12).to_bytes(4, 'little'))))
 

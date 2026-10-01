@@ -42,7 +42,8 @@ def parse_record(line: str) -> dict:
             raise ValueError("timestamp out of range")
         record.update(kind="packet", capture_valid=record["changed"] == 0, sym=symbols[:2*n])
         result = decode_lora_symbol_trace(list(bytes.fromhex(record["sym"])),
-                                         0 if record["realigned"] else record["pbin"]).result
+                                         0 if record["realigned"] else record["pbin"],
+                                         require_payload_crc=True).result
         # This finite bench sends explicit-header packets with payload CRC.
         # The general decoder accepts CRC-disabled packets by design; a noisy
         # header can flip that flag and must not bypass the bench CRC policy.
