@@ -14,6 +14,16 @@ from pathlib import Path
 import numpy as np
 
 
+def robust_line(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Median pairwise slope and median intercept; keep every residual afterward."""
+    slopes = [(y[j] - y[i]) / (x[j] - x[i])
+              for i in range(len(x)) for j in range(i+1, len(x)) if x[j] != x[i]]
+    if not slopes:
+        raise ValueError('control timestamps must span distinct transmissions')
+    slope = float(np.median(slopes))
+    return slope, float(np.median(y - slope*x))
+
+
 def analyze(report: dict) -> dict:
     if report.get('schema') != 'finite-per-v1': raise ValueError('unsupported finite series schema')
     config = report['configuration']
@@ -66,15 +76,15 @@ def analyze(report: dict) -> dict:
                     for key, values in groups.items()}
                 control = np.array([trials[r['seq']]['cfo_hz'] == 0 for r in rows])
                 if np.count_nonzero(control) >= 3:
-                    ca, cb = np.linalg.lstsq(np.column_stack((tx[control], np.ones(sum(control)))),
-                                           rx[control], rcond=None)[0]
+                    ca, cb = robust_line(tx[control], rx[control])
                     errors = rx - (ca*tx+cb)
                     control_groups = {}
                     for row, error in zip(rows, errors):
                         key = str(trials[row['seq']]['cfo_hz'])
                         control_groups.setdefault(key, []).append(float(error))
                     result['zero_cfo_reference'] = {
-                        'interpretation': 'offset/clock fit on zero-CFO records of this series; other CFO groups evaluated against that fit',
+                        'interpretation': 'median pairwise slope/median epoch on zero-CFO controls; all records, including control outliers, retained in residuals',
+                        'fit_method': 'median pairwise slope and median intercept',
                         'clock_scale_ppm': float((ca-1)*1e6),
                         'groups': {key: {'count':len(values),
                             'median_error_ns':float(np.median(values)/fs*1e9),

@@ -83,6 +83,9 @@ measure RF input bias, absolute ToA accuracy or inter-receiver synchronization.
 Retain those distinctions in plots and publications.
 For injected CFO trials it additionally fits only the zero-CFO control records
 and evaluates other CFO groups against that fit, so a joint fit does not hide
-CFO-dependent bias. Sample-drop counter changes anywhere among the packet reads
+CFO-dependent bias. This control fit uses the median pairwise slope and median
+intercept so a rare whole-symbol error does not move every group's reference.
+All records, including control outliers, remain in the reported residuals.
+Sample-drop counter changes anywhere among the packet reads
 invalidate continuity of the point's relative timebase, even if a particular
 packet's own before/after counts match.

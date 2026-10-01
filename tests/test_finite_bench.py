@@ -208,3 +208,18 @@ def test_cfo_groups_use_zero_cfo_control_instead_of_fitting_away_bias():
     groups=r['points'][0]['zero_cfo_reference']['groups']
     assert groups['1000.0']['median_error_ns'] == pytest.approx(100/4096*1000,abs=1e-6)
     assert abs(groups['0.0']['median_error_ns']) < 1e-6
+
+
+def test_control_outlier_does_not_move_reference_or_disappear():
+    rows = [dict(kind='packet',capture_valid=True,crc=True,toa_valid=True,seq=i,
+                 toa_samples_q12=(i*100+(1024 if i == 0 else 0))*4096+
+                                   (100 if i%2 else 0)) for i in range(20)]
+    trials = [dict(sequence=i,start_offset_samples=0,cfo_hz=1000.0 if i%2 else 0.0) for i in range(20)]
+    result = analyze({'schema':'finite-per-v1',
+                      'configuration':dict(tx_rate=1e6,gap=0,first_sequence=0,packets=20),
+                      'samples_per_packet':100,'template_sidecar':{'trials':trials},
+                      'points':[dict(snr_db=20,records=rows)]})['points'][0]['zero_cfo_reference']
+    assert result['groups']['1000.0']['median_error_ns'] == pytest.approx(100/4096*1000,abs=1e-6)
+    assert result['groups']['0.0']['over_one_sample'] == 1
+    assert result['groups']['0.0']['count'] == 10
+    assert max(s['error_ns'] for s in result['samples']) == pytest.approx(1024000)
