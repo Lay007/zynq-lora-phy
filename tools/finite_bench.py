@@ -43,7 +43,12 @@ def parse_record(line: str) -> dict:
         record.update(kind="packet", capture_valid=record["changed"] == 0, sym=symbols[:2*n])
         result = decode_lora_symbol_trace(list(bytes.fromhex(record["sym"])),
                                          0 if record["realigned"] else record["pbin"]).result
-        record["crc"] = bool(result.crc_valid)
+        # This finite bench sends explicit-header packets with payload CRC.
+        # The general decoder accepts CRC-disabled packets by design; a noisy
+        # header can flip that flag and must not bypass the bench CRC policy.
+        record["payload_crc_enabled"] = bool(result.header is not None and result.header.payload_crc)
+        record["crc"] = bool(record["payload_crc_enabled"] and result.crc_valid)
+        record["payload_hex"] = bytes(result.payload).hex()
         record["seq"] = seq_of(bytes(result.payload)) if record["crc"] else None
         reasons = []
         if record["changed"]: reasons.append("snapshot_changed")

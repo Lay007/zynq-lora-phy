@@ -28,7 +28,22 @@ def line(**overrides):
 @pytest.fixture
 def decode(monkeypatch):
     monkeypatch.setattr(bench, 'decode_lora_symbol_trace', lambda *a: SimpleNamespace(
-        result=SimpleNamespace(crc_valid=True, payload=b'ZLP1'+(12).to_bytes(4, 'little'))))
+        result=SimpleNamespace(crc_valid=True, header=SimpleNamespace(payload_crc=True),
+                               payload=b'ZLP1'+(12).to_bytes(4, 'little'))))
+
+
+def test_crc_disabled_header_cannot_bypass_finite_bench_crc_policy():
+    from zynq_lora_phy import encode_lora_packet
+    data = b'ZLP1' + (12).to_bytes(4, 'little')
+    symbols = encode_lora_packet(data, payload_crc_present=False).symbols
+    decoded = bench.decode_lora_symbol_trace(symbols, 0).result
+    assert decoded.crc_valid and decoded.payload == data and not decoded.header.payload_crc
+    r = bench.parse_record(line(n=str(len(symbols)), sym=bytes(symbols).hex().ljust(256, '0')))
+    assert r['kind'] == 'packet' and r['capture_valid']
+    assert not r['crc'] and r['seq'] is None and not r['payload_crc_enabled']
+    summary = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert summary['measurement_valid'] and summary['received_unique'] == 0
+    assert summary['per'] == 1 and summary['crc_fail'] == 1
 
 
 def test_full_timestamp_retains_64_bit_precision_and_raw_record(decode):
