@@ -7,7 +7,7 @@
 // lora_iq_history_buffer by absolute accepted-sample count. Reference
 // coefficients are supplied by an external ROM/table through reference_index;
 // the coefficient inputs must be combinational or otherwise stable throughout
-// the ISSUE cycle and are latched with the corresponding IQ read request.
+// each asserted iq_read_req cycle and are latched with the IQ read request.
 //
 // Correlation convention matches the MATLAB ToA reference:
 //
@@ -21,15 +21,15 @@
 // uint32. A constant power scale does not change the three-point log-domain
 // fractional-ToA interpolation because the common log scale cancels.
 //
-// The implementation intentionally favors low resource use over latency. Each
-// reference sample takes an ISSUE cycle plus a WAIT-for-history-response cycle;
-// the default 1024-sample SF7/L=8 reference therefore costs about 2050 clocks
-// per lag before higher-level search sequencing. This is packet-rate work, not
-// a continuous 1024-tap FIR.
+// With REQUEST_ON_RESPONSE=1 the next request accompanies accumulation of the
+// previous response. A one-cycle history port then costs N+3 clocks per lag,
+// instead of 2*N+2. There is still only one outstanding read; variable response
+// latency is allowed. Both modes reuse the same complex MAC datapath.
 module lora_matched_filter_mac #(
     parameter integer REF_SAMPLES = 1024,
     parameter integer ACC_WIDTH = 48,
-    parameter integer POWER_SHIFT = 30
+    parameter integer POWER_SHIFT = 30,
+    parameter integer REQUEST_ON_RESPONSE = 0
 ) (
     input  wire                         clk,
     input  wire                         resetn,
@@ -112,9 +112,19 @@ module lora_matched_filter_mac #(
 
     wire [2*ACC_WIDTH-1:0] shifted_power = power_full >> POWER_SHIFT;
 
-    assign iq_read_req = (state == STATE_ISSUE);
-    assign iq_read_sample_count = base_count_reg + sample_index;
-    assign reference_index = sample_index;
+    wire request_next = REQUEST_ON_RESPONSE && (state == STATE_WAIT) &&
+        iq_read_valid && !iq_read_miss &&
+        (iq_read_sample_count_out == pending_sample_count) &&
+        (sample_index < REF_SAMPLES-1);
+    // Prepare the next address/reference throughout WAIT, independently of
+    // response validation. This keeps the 64-bit response comparator off the
+    // address arithmetic path; only the request enable depends on it.
+    wire [15:0] request_index = (REQUEST_ON_RESPONSE && state == STATE_WAIT) ?
+        sample_index + 16'd1 : sample_index;
+    assign iq_read_req = resetn && !stream_reset &&
+        ((state == STATE_ISSUE) || request_next);
+    assign iq_read_sample_count = base_count_reg + request_index;
+    assign reference_index = request_index;
 
     initial begin
         if (REF_SAMPLES < 1 || REF_SAMPLES > 65535)
@@ -197,7 +207,14 @@ module lora_matched_filter_mac #(
                             acc_re       <= next_acc_re;
                             acc_im       <= next_acc_im;
                             sample_index <= sample_index + 16'd1;
-                            state        <= STATE_ISSUE;
+                            if (REQUEST_ON_RESPONSE) begin
+                                pending_sample_count <= iq_read_sample_count;
+                                pending_ref_re       <= reference_re;
+                                pending_ref_im       <= reference_im;
+                                state                <= STATE_WAIT;
+                            end else begin
+                                state <= STATE_ISSUE;
+                            end
                         end
                     end
                 end

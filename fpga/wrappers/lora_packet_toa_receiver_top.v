@@ -28,6 +28,9 @@ module lora_packet_toa_receiver_top #(
     parameter integer GRID_FINE_GUARD_SAMPLES = 16,
     parameter integer MATCH_ACC_WIDTH = 48,
     parameter integer MATCH_POWER_SHIFT = 30,
+    parameter integer MATCH_REQUEST_ON_RESPONSE = 0,
+    parameter integer JOINT_PREFETCH_UP = 0,
+    parameter integer MATCH_COARSE_STRIDE = 1,
     parameter DEFAULT_RECEIVER_ENABLE = 1'b0,
     parameter REFERENCE_FILE = "fpga/rom/lora_sf7_l8_reference_q10.mem"
 ) (
@@ -215,7 +218,9 @@ module lora_packet_toa_receiver_top #(
     wire detector_straddle;
     assign packet_straddle_detected = detector_straddle;
 
-    lora_fft_detector_timestamp_path u_fft_detector_timestamp (
+    lora_fft_detector_timestamp_path #(
+        .QUALIFY_PREAMBLE_TIMESTAMP(JOINT_PREFETCH_UP)
+    ) u_fft_detector_timestamp (
         .clk(clk),
         .resetn(resetn),
         .iq_in_re(iq_in_re),
@@ -337,16 +342,25 @@ module lora_packet_toa_receiver_top #(
     // straddle-tolerant path (M7) decides how the controller unwraps the
     // arrival phase, and it too is only valid on `detected`.
     reg        held_packet_straddle;
+    reg        held_packet_early_sync;
+    reg [15:0] held_preamble_chips;
+    always @(posedge clk) begin
+        if (!resetn || reset_in) held_preamble_chips <= 16'd0;
+        else if (preamble_detected) held_preamble_chips <= chips_to_boundary;
+    end
     always @(posedge clk) begin
         if (!resetn) begin
             held_chips_to_boundary <= 16'd0;
             held_packet_straddle   <= 1'b0;
+            held_packet_early_sync <= 1'b0;
         end else if (reset_in) begin
             held_chips_to_boundary <= 16'd0;
             held_packet_straddle   <= 1'b0;
+            held_packet_early_sync <= 1'b0;
         end else if (detected) begin
             held_chips_to_boundary <= chips_to_boundary;
             held_packet_straddle   <= detector_straddle;
+            held_packet_early_sync <= packet_early_sync_detected;
         end
     end
     wire raw_search_failure = toa_underflow_error || raw_search_restart_error ||
@@ -360,6 +374,7 @@ module lora_packet_toa_receiver_top #(
                 .SAMPLES_PER_CHIP(8),
                 .SYMBOL_SAMPLES(REF_SAMPLES),
                 .SEARCH_RADIUS(SEARCH_RADIUS),
+                .PREFETCH_UP(JOINT_PREFETCH_UP),
                 .FINE_GUARD_SAMPLES(GRID_FINE_GUARD_SAMPLES),
                 .PREAMBLE_TO_SFD_SYMBOLS(10)
             ) u_joint_grid_timing (
@@ -370,11 +385,16 @@ module lora_packet_toa_receiver_top #(
                 .packet_start_count(packet_start_count),
                 .chips_to_boundary(held_chips_to_boundary),
                 .packet_straddle(held_packet_straddle),
+                .packet_early_sync(held_packet_early_sync),
+                .preamble_start_valid(preamble_start_valid_unused && receiver_enable),
+                .preamble_start_count(preamble_start_count_unused),
+                .preamble_chips_to_boundary(held_preamble_chips),
                 .history_next_sample_count(history_next_sample_count),
                 .search_busy(raw_search_busy),
                 .search_failed(raw_search_failure),
                 .search_triplet_valid(raw_peak_triplet_valid),
                 .search_peak_sample_count(peak_sample_count),
+                .search_peak_power(magnitude_peak),
                 .search_offset_q12(toa_offset_q12[15:0]),
                 .search_offset_valid(toa_offset_valid),
                 .search_start(joint_search_start),
@@ -441,7 +461,9 @@ module lora_packet_toa_receiver_top #(
         .REF_SAMPLES(REF_SAMPLES),
         .SEARCH_RADIUS(SEARCH_RADIUS),
         .ACC_WIDTH(MATCH_ACC_WIDTH),
-        .POWER_SHIFT(MATCH_POWER_SHIFT)
+        .POWER_SHIFT(MATCH_POWER_SHIFT),
+        .REQUEST_ON_RESPONSE(MATCH_REQUEST_ON_RESPONSE),
+        .COARSE_STRIDE(MATCH_COARSE_STRIDE)
     ) u_toa_search (
         .clk(clk),
         .resetn(resetn),

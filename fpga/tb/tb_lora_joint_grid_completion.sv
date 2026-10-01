@@ -16,6 +16,11 @@ module tb_lora_joint_grid_completion;
     localparam integer SF = 7;
     localparam integer SAMPLES_PER_CHIP = 8;
     parameter integer HISTORY_DEPTH = 65536;
+    parameter integer SEARCH_RADIUS = 16;
+    parameter integer FINE_GUARD = 16;
+    parameter integer FAST_MAC = 0;
+    parameter integer PREFETCH_UP = 0;
+    parameter integer COARSE_STRIDE = 1;
     localparam integer SYMBOL_COUNT = (1 << SF);
     localparam integer SAMPLES_PER_SYMBOL = SYMBOL_COUNT * SAMPLES_PER_CHIP;
     localparam real PI = 3.14159265358979323846;
@@ -132,6 +137,9 @@ module tb_lora_joint_grid_completion;
     integer metadata_seen = 0;
     integer metadata_error = 0;
     integer timeout_cycles = 0;
+    integer clock_count = 0;
+    integer first_search_clock = -1;
+    integer last_search_clock = -1;
     reg [31:0] expected_symbol [0:10];
     reg [31:0] read_value;
     reg [63:0] captured_metadata_coarse = 64'd0;
@@ -142,7 +150,10 @@ module tb_lora_joint_grid_completion;
     // the miss condition is unreachable. On the board the count runs into the
     // millions and that half is live. A shallow history makes it reachable
     // without driving a million samples.
-    lora_packet_toa_receiver_top #(.HISTORY_DEPTH(HISTORY_DEPTH)) dut (
+    lora_packet_toa_receiver_top #(.HISTORY_DEPTH(HISTORY_DEPTH),
+        .SEARCH_RADIUS(SEARCH_RADIUS), .GRID_FINE_GUARD_SAMPLES(FINE_GUARD),
+        .MATCH_REQUEST_ON_RESPONSE(FAST_MAC), .JOINT_PREFETCH_UP(PREFETCH_UP),
+        .MATCH_COARSE_STRIDE(COARSE_STRIDE)) dut (
         .clk(clk), .resetn(resetn),
         .iq_in_re(iq_in_re), .iq_in_im(iq_in_im), .valid_in(valid_in),
         .reset_in(reset_in), .trace_rearm_in(1'b0), .resync_valid(resync_valid),
@@ -321,6 +332,7 @@ module tb_lora_joint_grid_completion;
     endtask
 
     always @(posedge clk) begin
+        clock_count = clock_count + 1;
         #1;
         if (resetn) begin
             // The symbol and correlation sequences belong to
@@ -339,14 +351,21 @@ module tb_lora_joint_grid_completion;
             end else begin
                 resync_valid <= 1'b0;
             end
-            if (dut.g_joint_grid_timing.u_joint_grid_timing.search_start)
+            if (dut.g_joint_grid_timing.u_joint_grid_timing.search_start) begin
+                if (first_search_clock < 0) first_search_clock = clock_count;
+                last_search_clock = clock_count;
                 joint_search_start_seen = joint_search_start_seen + 1;
+            end
             if (dut.g_joint_grid_timing.u_joint_grid_timing.search_failed)
                 joint_search_failed_seen = joint_search_failed_seen + 1;
             if (dut.g_joint_grid_timing.u_joint_grid_timing.timing_valid)
                 joint_timing_valid_seen = joint_timing_valid_seen + 1;
-            if (dut.g_joint_grid_timing.u_joint_grid_timing.fine_resync_valid)
+            if (dut.g_joint_grid_timing.u_joint_grid_timing.fine_resync_valid) begin
+                $display("LATENCY joint_total_clocks=%0d down_to_fine_clocks=%0d accepted_samples=%0d cfo_q12=%0d radius=%0d fast=%0d",
+                         clock_count-first_search_clock, clock_count-last_search_clock,
+                         history_next_sample_count, $signed(dut.g_joint_grid_timing.u_joint_grid_timing.cfo_q12), SEARCH_RADIUS, FAST_MAC);
                 joint_fine_resync_seen = joint_fine_resync_seen + 1;
+            end
             if (dut.g_joint_grid_timing.u_joint_grid_timing.timing_range_error)
                 joint_range_error_seen = joint_range_error_seen + 1;
             if (packet_start_valid) begin
@@ -477,7 +496,7 @@ module tb_lora_joint_grid_completion;
                      dut.g_joint_grid_timing.u_joint_grid_timing.state);
         end
         if (joint_search_failed_seen != 0 &&
-            dut.g_joint_grid_timing.u_joint_grid_timing.fine_skip !== 32'd16) begin
+            dut.g_joint_grid_timing.u_joint_grid_timing.fine_skip !== FINE_GUARD) begin
             errors = errors + 1;
             $display("FAIL aborted search returned skip=%0d, expected the bare 16-sample guard",
                      dut.g_joint_grid_timing.u_joint_grid_timing.fine_skip);

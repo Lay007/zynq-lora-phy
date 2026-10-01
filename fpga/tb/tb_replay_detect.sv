@@ -24,6 +24,11 @@ module tb_replay_detect;
     localparam integer SF = 7;
     localparam integer SAMPLES_PER_CHIP = 8;
     parameter integer HISTORY_DEPTH = 65536;
+    parameter integer SEARCH_RADIUS = 16;
+    parameter integer FINE_GUARD = 16;
+    parameter integer FAST_MAC = 0;
+    parameter integer PREFETCH_UP = 0;
+    parameter integer COARSE_STRIDE = 1;
     localparam integer SYMBOL_COUNT = (1 << SF);
     localparam integer SAMPLES_PER_SYMBOL = SYMBOL_COUNT * SAMPLES_PER_CHIP;
     localparam real PI = 3.14159265358979323846;
@@ -108,7 +113,10 @@ module tb_replay_detect;
     reg [63:0] history_count_before_rearm = 64'd0;
     reg [63:0] history_count_at_second_start = 64'd0;
 
-    lora_packet_toa_receiver_top #(.HISTORY_DEPTH(HISTORY_DEPTH)) dut (
+    lora_packet_toa_receiver_top #(.HISTORY_DEPTH(HISTORY_DEPTH),
+        .SEARCH_RADIUS(SEARCH_RADIUS), .GRID_FINE_GUARD_SAMPLES(FINE_GUARD),
+        .MATCH_REQUEST_ON_RESPONSE(FAST_MAC), .JOINT_PREFETCH_UP(PREFETCH_UP),
+        .MATCH_COARSE_STRIDE(COARSE_STRIDE)) dut (
         .clk(clk), .resetn(resetn),
         .iq_in_re(iq_in_re), .iq_in_im(iq_in_im), .valid_in(valid_in),
         .reset_in(reset_in), .trace_rearm_in(trace_rearm_in),
@@ -170,6 +178,7 @@ module tb_replay_detect;
     // that depends on its result in time (grid correction, CFO removal) acts
     // on the packet's own symbols.
     integer gap = 1;
+    integer gap_half = 0;
     // +gap_det=N: one sample every N clocks only from the detection until the
     // joint search reports, 1 elsewhere. That is the only stretch where the
     // clocks-per-sample ratio changes anything (the search has to finish before
@@ -178,6 +187,10 @@ module tb_replay_detect;
     integer gap_det = 1;
     integer g;
     integer this_gap;
+    integer clocks = 0;
+    integer first_search_clock = -1;
+    integer last_search_clock = -1;
+    integer detection_clock = -1;
     reg det_seen = 1'b0;
     reg joint_done = 1'b0;
 
@@ -197,8 +210,13 @@ module tb_replay_detect;
     endtask
 
     always @(posedge clk) begin
+        clocks = clocks + 1;
         #1;
         if (resetn) begin
+            if (dut.g_joint_grid_timing.u_joint_grid_timing.search_start) begin
+                if (first_search_clock < 0) first_search_clock = clocks;
+                last_search_clock = clocks;
+            end
             if (valid_in) sample_cnt = sample_cnt + 1;
             if (symbol_valid)
                 $display("SYM %0d %0d", symbol_index, dut.symbol_sample_count);
@@ -207,6 +225,9 @@ module tb_replay_detect;
             if (packet_start_valid)
                 $display("PSC %0d n=%0d", packet_start_count, sample_cnt);
             if (dut.g_joint_grid_timing.u_joint_grid_timing.fine_resync_valid) begin
+                $display("LATENCY joint_total_clocks=%0d down_to_fine_clocks=%0d n=%0d cfo_q12=%0d detection_to_fine_clocks=%0d",
+                         clocks-first_search_clock, clocks-last_search_clock,
+                         sample_cnt, $signed(dut.g_joint_grid_timing.u_joint_grid_timing.cfo_q12),clocks-detection_clock);
                 joint_done <= 1'b1;
                 $display("JNT up_coarse=%0d corr=%0d range=%0d upab=%0d dnab=%0d precise=%0d up_off=%0d skip=%0d",
                          dut.g_joint_grid_timing.u_joint_grid_timing.up_coarse_start,
@@ -226,6 +247,7 @@ module tb_replay_detect;
             if (metadata_valid)
                 $display("META %0d %0d", metadata_coarse, $signed(metadata_fractional_q12));
             if (detected) begin
+                detection_clock = clocks;
                 det_seen = 1'b1;
                 det_count = det_count + 1;
 `ifdef REPLAY_NO_SPLIT
@@ -250,6 +272,8 @@ module tb_replay_detect;
         // the joint search (much faster when only detection matters).
         if (!$value$plusargs("wait_joint=%d", wait_joint)) wait_joint = 1;
         if (!$value$plusargs("gap=%d", gap)) gap = 1;
+        // +gap=62 +gap_half=1 models exactly 62.5 receiver clocks/sample.
+        if (!$value$plusargs("gap_half=%d", gap_half)) gap_half = 0;
         if (!$value$plusargs("gap_det=%d", gap_det)) gap_det = 1;
         $readmemh(iq_file, mem);
         $display("MEM %h %h %h n=%0d file=[%0s]", mem[0], mem[5000], mem[9000], n_samples, iq_file);
@@ -263,6 +287,7 @@ module tb_replay_detect;
             iq_in_im <= $signed(mem[i][15:0]);
             valid_in <= 1'b1;
             this_gap = (det_seen && !joint_done && gap_det > gap) ? gap_det : gap;
+            if (gap_half && this_gap > 1) this_gap = this_gap + (i % 2);
             for (g = 1; g < this_gap; g = g + 1) begin
                 @(negedge clk);
                 valid_in <= 1'b0;

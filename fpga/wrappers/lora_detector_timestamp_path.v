@@ -16,7 +16,9 @@
 `define LORA_BLIND_DETECTOR_MODULE BlindDetector
 `endif
 
-module lora_detector_timestamp_path (
+module lora_detector_timestamp_path #(
+    parameter integer QUALIFY_PREAMBLE_TIMESTAMP = 0
+) (
     input  wire        clk,
     input  wire        resetn,
     input  wire        clk_enable,
@@ -315,7 +317,9 @@ module lora_detector_timestamp_path (
         .resetn(align_resetn),
         .symbol_sample_count(symbol_sample_count),
         .symbol_timestamp_valid(timestamp_valid),
-        .preamble_detected(preamble_detected),
+        // Quiet windows decide bin zero, so do not cache their up estimates.
+        .preamble_detected(preamble_detected && (!QUALIFY_PREAMBLE_TIMESTAMP ||
+                            ((&prev_present[6:0]) && symbol_peak != 16'd0))),
         .packet_detected(detected),  // generated OR straddle-tolerant
         .preamble_start_count(preamble_start_count),
         .preamble_start_valid(preamble_start_valid),

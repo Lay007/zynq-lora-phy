@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module tb_lora_matched_filter_mac;
+    parameter integer REQUEST_ON_RESPONSE = 0;
     localparam integer REF_SAMPLES = 4;
     localparam integer ACC_WIDTH = 40;
 
@@ -72,7 +73,8 @@ module tb_lora_matched_filter_mac;
     lora_matched_filter_mac #(
         .REF_SAMPLES(REF_SAMPLES),
         .ACC_WIDTH(ACC_WIDTH),
-        .POWER_SHIFT(0)
+        .POWER_SHIFT(0),
+        .REQUEST_ON_RESPONSE(REQUEST_ON_RESPONSE)
     ) dut (
         .clk(clk),
         .resetn(resetn),
