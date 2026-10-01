@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -39,13 +40,13 @@ PHY = "/sys/bus/iio/devices/iio:device0"
 TEMPLATE_COUNT = {7: 64, 8: 64, 9: 32, 10: 16, 11: 8, 12: 8}
 
 
-def ssh(password: str):
+def ssh(password: str, host: str = "192.168.40.1", known_hosts: Path | None = None):
     import paramiko  # only the bench needs it; keeps the module importable in CI
 
     c = paramiko.SSHClient()
-    c.load_host_keys(str(KNOWN_HOSTS))
+    c.load_host_keys(str(known_hosts if known_hosts is not None else KNOWN_HOSTS))
     c.set_missing_host_key_policy(paramiko.RejectPolicy())
-    c.connect("192.168.40.1", username="root", password=password, timeout=15,
+    c.connect(host, username="root", password=password, timeout=15,
               look_for_keys=False, allow_agent=False)
     return c
 
@@ -53,15 +54,22 @@ def ssh(password: str):
 def run(c, cmd: str, timeout: float = 120) -> str:
     _, o, e = c.exec_command(cmd, timeout=timeout)
     out = o.read().decode()
-    o.channel.recv_exit_status()
-    return out + e.read().decode()
+    status = o.channel.recv_exit_status()
+    output = out + e.read().decode()
+    if status:
+        raise RuntimeError(f"Remote command exited {status}: {cmd}\n{output}")
+    return output
 
 
 def put(c, local: Path, remote: str) -> None:
-    i, o, _ = c.exec_command(f"cat > {remote}")
-    i.write(local.read_bytes())
+    i, o, e = c.exec_command(f"cat > {shlex.quote(remote)}")
+    with local.open('rb') as source:
+        while chunk := source.read(1024 * 1024):
+            i.write(chunk)
     i.channel.shutdown_write()
-    o.channel.recv_exit_status()
+    status = o.channel.recv_exit_status()
+    if status:
+        raise RuntimeError(f"Upload exited {status}: {e.read().decode()}")
 
 
 def board_temps(c) -> dict:
@@ -78,14 +86,14 @@ def board_temps(c) -> dict:
 
 
 def tx_configure(c, tx_atten_db: float) -> str:
-    return run(c, f"echo 868100000 > {PHY}/out_altvoltage1_TX_LO_frequency; "
+    return run(c, f"set -e; echo 868100000 > {PHY}/out_altvoltage1_TX_LO_frequency; "
                   f"echo 0 > {PHY}/out_altvoltage1_TX_LO_powerdown; "
                   f"echo -{abs(tx_atten_db)} > {PHY}/out_voltage0_hardwaregain; "
                   f"cat {PHY}/out_altvoltage1_TX_LO_frequency {PHY}/out_voltage0_hardwaregain")
 
 
 def tx_off(c) -> None:
-    run(c, "killall iio_writedev lora_tx_noise 2>/dev/null; sleep 0.3; "
+    run(c, "killall iio_writedev lora_tx_noise 2>/dev/null || :; sleep 0.3; set -e; "
            f"echo -89.75 > {PHY}/out_voltage0_hardwaregain; echo 1 > {PHY}/out_altvoltage1_TX_LO_powerdown")
 
 
