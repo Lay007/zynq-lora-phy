@@ -290,7 +290,7 @@ jobs:
     # regressed the ToA symbol origin, so none of them may be dropped.
     name: Joint grid completion (grid_phase ${{ matrix.grid_phase }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

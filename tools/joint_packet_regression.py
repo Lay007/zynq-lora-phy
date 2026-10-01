@@ -30,6 +30,7 @@ for name in args.extra_source:
     if not path.is_relative_to(tree) or not path.is_file():
         parser.error('extra source must be an existing file in the source tree')
     sources.append(str(path.relative_to(tree)))
+(out/'provenance.json').write_text(json.dumps({'pl_clock_hz':62500000,'sample_rate_hz':1000000,'search_radius':48,'guard_samples':48,'coarse_stride':2,'prefetch_up':True,'request_on_response':True,'verilator_version':subprocess.check_output(['verilator','--version'],text=True).strip(),'source_sha256':{name:hashlib.sha256((tree/name).read_bytes()).hexdigest() for name in sources}},indent=2)+'\n')
 directory=out/'simulator'
 cmd=['verilator','--binary','--timing','-j',str(args.jobs),'-Wno-fatal',
      '--unroll-count','4096','--unroll-stmts','1000000',
@@ -87,5 +88,4 @@ for phase,cfo,preamble,fraction in cases:
     print(row,flush=True)
     if not (row['crc_valid'] and row['payload_match'] and abs(error)<.5 and row['header_margin_samples']>96):
         raise RuntimeError('full packet regression failed: '+name)
-(out/'provenance.json').write_text(json.dumps({'pl_clock_hz':62500000,'sample_rate_hz':1000000,'search_radius':48,'guard_samples':48,'coarse_stride':2,'prefetch_up':True,'request_on_response':True,'verilator_version':subprocess.check_output(['verilator','--version'],text=True).strip(),'source_sha256':{name:hashlib.sha256((tree/name).read_bytes()).hexdigest() for name in sources}},indent=2)+'\n')
 print('PASS full packet CRC/ToA/deadline at 62.5 clocks/sample',flush=True)
