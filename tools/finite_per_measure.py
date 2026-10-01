@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -57,7 +57,7 @@ def measure(c, args, prefix: str, spp: int, snr: float, seed: int, checkpoint) -
     max_seconds = 2 * padded / args.tx_rate + 60
     point = {'snr_db': snr, 'seed': seed, 'records': [], 'status': 'starting',
              'expected_samples': padded, 'lead_samples': lead, 'tail_samples': tail,
-             'started_utc': datetime.now(UTC).isoformat()}
+             'started_utc': datetime.now(timezone.utc).isoformat()}
     checkpoint(point)
     raw = args.out.with_name(args.out.stem + f'.snr-{snr:g}.trace.txt')
     capture_command = (f'echo $$ > {prefix}.capture.pid; exec {prefix}.trace 0 1000 '
