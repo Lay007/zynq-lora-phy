@@ -88,6 +88,18 @@ python tools/summarize_capture_run.py experiments/runs/RUN --planned-attempts 10
 Missing or unclassifiable records make the exit status non-zero. Capture
 failures stay separate from CRC failures and from detection misses.
 
+For a compact machine-readable capture/CRC accounting report, use:
+
+```bash
+python tools/summarize_capture_campaign.py experiments/runs/RUN --planned-attempts 1000
+```
+
+This strict JSON report requires a positive integer IQ sample count and a Boolean
+CRC verdict for each capture. It reports missing and unclassified records and
+keeps failed acquisition attempts separate. Use `summarize_capture_run.py` above
+for detailed detector-path and clock-crossing diagnostics. Neither report
+qualifies calibrated ToA or PHY PER.
+
 Каждый этап закрывается по артефактам. Изменение gain/FIR/частоты требует
 проверки применимости калибровки.
 
