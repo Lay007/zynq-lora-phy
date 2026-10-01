@@ -46,12 +46,18 @@ jobs:
           sudo apt-get install -y iverilog
       - name: Check accelerated MAC, sparse refinement, prefetch and signal presence
         run: |
-          for n in 1 17 1024; do
-            for fast in 0 1; do
-              iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=$n -Ptb_lora_mac_response_pipeline.FAST=$fast -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
-              vvp /tmp/mac-pipeline
-            done
-          done
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=17 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=17 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1024 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1024 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
           iverilog -g2012 -s tb_lora_search_stride -o /tmp/search-stride fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/tb/tb_lora_search_stride.sv
           vvp /tmp/search-stride
           iverilog -g2012 -s tb_lora_joint_prefetch -o /tmp/joint-prefetch fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/tb/tb_lora_joint_prefetch.sv
