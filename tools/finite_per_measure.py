@@ -49,6 +49,24 @@ def generator_summary(text: str) -> dict:
     return {key: int(value) for key, value in (item.split('=') for item in lines[0].split()[1:])}
 
 
+def start_tx(c, args, prefix, spp, snr, seed, padded, max_seconds):
+    """Launch the finite generator/writer and expose both exit statuses."""
+    gap, lead, tail = int(args.gap*args.tx_rate), int(args.tx_rate), int(2*args.tx_rate)
+    fifo = prefix + '.fifo'
+    gen = (f'{prefix}.noise {prefix}.c64 {args.packets} {spp} {gap} '
+           f'{snr} {args.bw*1000} -14 {seed} {args.tx_rate} {args.packets} {lead} {tail}')
+    command = (f'mkfifo {fifo} || exit 1; {gen} > {fifo} 2>{prefix}.noise.err & producer=$!; '
+               f'echo "$producer" > {prefix}.producer.pid; '
+               f'iio_writedev -b 262144 -s {padded} cf-ad9361-dds-core-lpc '
+               f'< {fifo} >{prefix}.writer.log 2>&1; writer=$?; '
+               'if [ "$writer" -ne 0 ]; then kill "$producer" 2>/dev/null || :; fi; '
+               'wait "$producer"; producer_status=$?; '
+               f'rm -f {fifo}; echo TX_EXIT producer=$producer_status writer=$writer; '
+               '[ "$producer_status" -eq 0 ] && [ "$writer" -eq 0 ]')
+    _, tx_out, tx_err = c.exec_command(command, timeout=max_seconds)
+    return tx_out, tx_err
+
+
 def measure(c, args, prefix: str, spp: int, snr: float, seed: int, checkpoint) -> dict:
     gap = int(args.gap * args.tx_rate)
     lead, tail = int(args.tx_rate), int(2 * args.tx_rate)
@@ -75,20 +93,7 @@ def measure(c, args, prefix: str, spp: int, snr: float, seed: int, checkpoint) -
                 if not line: raise RuntimeError('capture exited before READY')
                 log.write(line); log.flush()
                 if line.startswith('READY '): break
-            fifo = prefix + '.fifo'
-            gen = (f'{prefix}.noise {prefix}.c64 {args.packets} {spp} {gap} '
-                   f'{snr} {args.bw * 1000} -14 {seed} {args.tx_rate} '
-                   f'{args.packets} {lead} {tail}')
-            # A POSIX pipeline alone only exposes the writer status. Collect both.
-            command = (f'mkfifo {fifo} || exit 1; {gen} > {fifo} 2>{prefix}.noise.err & producer=$!; '
-                       f'echo "$producer" > {prefix}.producer.pid; '
-                       f'iio_writedev -b 262144 -s {padded} cf-ad9361-dds-core-lpc '
-                       f'< {fifo} >{prefix}.writer.log 2>&1; writer=$?; '
-                       'if [ "$writer" -ne 0 ]; then kill "$producer" 2>/dev/null || :; fi; '
-                       'wait "$producer"; producer_status=$?; '
-                       f'rm -f {fifo}; echo TX_EXIT producer=$producer_status writer=$writer; '
-                       '[ "$producer_status" -eq 0 ] && [ "$writer" -eq 0 ]')
-            _, tx_out, tx_err = c.exec_command(command, timeout=max_seconds)
+            tx_out, tx_err = start_tx(c, args, prefix, spp, snr, seed, padded, max_seconds)
             tx = tx_out.channel
             point['status'] = 'collecting'
             checkpoint(point)
@@ -153,6 +158,7 @@ def measure(c, args, prefix: str, spp: int, snr: float, seed: int, checkpoint) -
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', default='192.168.40.1')
+    parser.add_argument('--receiver', default='pl', help='pl or serial port of Heltec V4 receiver firmware >=0.2.0')
     parser.add_argument('--known-hosts', type=Path, required=True)
     parser.add_argument('--password', default='analog')
     parser.add_argument('--bin-dir', type=Path, default=ROOT / 'board/per')
@@ -171,13 +177,15 @@ def main() -> int:
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--templates', type=Path, help='prebuilt uniquely numbered complex64 templates and .json sidecar')
     args = parser.parse_args()
-    if (args.sf != 7 or args.bw != 125 or not 1 <= args.cr <= 4 or args.tx_rate != 1e6
+    if ((args.receiver == 'pl' and (args.sf != 7 or args.bw != 125))
+            or not 7 <= args.sf <= 12 or args.bw not in (125,250,500)
+            or not 1 <= args.cr <= 4 or args.tx_rate != 1e6
             or not 1 <= args.packets <= 500 or args.first_sequence < 0
             or args.first_sequence + args.packets > 2**32 or args.gap < 0.15
             or not 0 <= args.rx_gain <= 73 or not 0 <= args.tx_atten <= 89.75
             or not all(math.isfinite(x) for x in [*args.snr, args.gap, args.rx_gain, args.tx_atten])
             or len(set(args.snr)) != len(args.snr)):
-        parser.error('finite PL mode requires SF7/BW125/1MS/s, valid RF values, 1..500 distinct packets and gap >=0.15s')
+        parser.error('PL requires SF7/BW125; serial supports SF7..12/BW125/250/500; use 1MS/s, CR1..4, valid RF values, 1..500 distinct packets and gap >=0.15s')
     if args.out.exists(): parser.error('output exists; select a new series path')
     build_info = json.loads((args.bin_dir / 'per-tools-manifest.json').read_text(encoding='utf-8'))
     if not build_info['target'].startswith('arm'): parser.error('board binaries require an ARM compiler')
@@ -186,6 +194,12 @@ def main() -> int:
                 sha256(ROOT / 'board/per' / (name + '.c')) != build_info['files'][name]['source_sha256']):
             parser.error('board tools/source differ from build manifest; rebuild before measuring')
     args.out.parent.mkdir(parents=True, exist_ok=True)
+    if args.receiver != 'pl' and not args.templates:
+        from lora_tx_waveform import packet_waveform
+        from lora_per_ideal import test_payload
+        estimate = packet_waveform(test_payload(args.first_sequence),args.sf,args.bw*1000,args.cr,args.tx_rate).size*8
+        if estimate*args.packets > 384*1024**2:
+            parser.error(f'template batch too large for the board RAM filesystem; use --packets <= {384*1024**2//estimate} and aggregate distinct finite batches')
     tpl = args.out.with_suffix('.c64')
     if args.templates:
         tpl = args.templates
@@ -212,7 +226,7 @@ def main() -> int:
     report = {'schema': 'finite-per-v1', 'configuration': {
         k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items() if k != 'password'},
         'points': [], 'status': 'starting', 'source_files': {str(p.relative_to(ROOT)): sha256(p)
-            for p in [Path(__file__), ROOT / 'tools/finite_bench.py', ROOT / 'tools/per_measure.py',
+            for p in [Path(__file__), ROOT / 'tools/finite_bench.py', ROOT / 'tools/finite_serial_bench.py', ROOT / 'tools/lora_per_ideal.py', ROOT / 'tools/per_measure.py',
                       ROOT / 'tools/lora_tx_waveform.py', ROOT / 'board/per/lora_trace_stream.c',
                       ROOT / 'board/per/lora_tx_noise.c', ROOT / 'tools/build_per_tools.py']},
         'binaries': {name: sha256(args.bin_dir / name) for name in ['lora_trace_stream', 'lora_tx_noise']},
@@ -230,8 +244,9 @@ def main() -> int:
     try:
         bench.tx_off(c)
         report['board_identity'] = bench.run(c, 'uname -a; sha256sum /mnt/mmcblk0p1/system_top.bit; iio_writedev -V')
-        signature = bench.run(c, 'devmem 0x790405c8 32').strip().lower()
-        if signature != '0x4c4f5241': raise RuntimeError('unexpected PL signature: ' + signature)
+        if args.receiver == 'pl':
+            signature = bench.run(c, 'devmem 0x790405c8 32').strip().lower()
+            if signature != '0x4c4f5241': raise RuntimeError('unexpected PL signature: ' + signature)
         if args.restore_profile:
             profile = args.out.with_suffix('.restore.sh')
             profile.write_bytes((ROOT / 'fpga/board/clg400/restore_rx_profile.sh').read_bytes().replace(b'\r\n', b'\n'))
@@ -242,10 +257,18 @@ def main() -> int:
         if report['rx_profile'].split() != ['1000000', 'manual', '1']:
             raise RuntimeError('restore the 1MS/s manual-gain FIR profile first')
         bench.run(c, 'if pidof iio_readdev >/dev/null; then echo RX_DMA_ACTIVE; exit 1; fi')
+        report['tx_profile'] = bench.run(c, f'cat {bench.PHY}/out_voltage_sampling_frequency {bench.PHY}/out_voltage_filter_fir_en {bench.PHY}/out_voltage_rf_bandwidth')
+        if report['tx_profile'].split()[:2] != ['1000000','1']:
+            raise RuntimeError('TX rate/FIR differs from the qualified 1MS/s profile')
+        free_kib = int(bench.run(c, 'df -k /tmp').splitlines()[-1].split()[3])
+        if tpl.stat().st_size+32*1024**2 > free_kib*1024:
+            raise RuntimeError('insufficient board /tmp space for finite templates and logs; reduce batch size')
         for name, target in [('lora_trace_stream', '.trace'), ('lora_tx_noise', '.noise')]:
             bench.put(c, args.bin_dir / name, prefix + target)
         bench.put(c, tpl, prefix + '.c64')
-        bench.run(c, f'chmod +x {prefix}.trace {prefix}.noise; devmem 0x79040404 32 0x1203; sleep 0.1; devmem 0x79040404 32 0x1201')
+        bench.run(c, f'chmod +x {prefix}.trace {prefix}.noise')
+        if args.receiver == 'pl':
+            bench.run(c, 'devmem 0x79040404 32 0x1203; sleep 0.1; devmem 0x79040404 32 0x1201')
         report['temps_start'] = bench.board_temps(c)
         report['tx_state'] = bench.tx_configure(c, args.tx_atten)
         report['gain_readback'] = bench.run(c, f'set -e; echo {args.rx_gain} > {bench.PHY}/in_voltage0_hardwaregain; '
@@ -256,7 +279,12 @@ def main() -> int:
             def checkpoint(point):
                 report['points'][-1] = point
                 save(args.out, report)
-            point = measure(c, args, prefix, spp, snr, args.seed+i, checkpoint)
+            if args.receiver == 'pl':
+                point = measure(c, args, prefix, spp, snr, args.seed+i, checkpoint)
+            else:
+                from finite_serial_bench import measure_serial
+                point = measure_serial(c, args, prefix, spp, snr, args.seed+i, checkpoint,
+                                       start_tx, generator_summary)
             print(f"SNR {snr:+g}: {point['received_unique']}/{args.packets}, PER={point['per']}, ToA={point['usable_toa']}, valid={point['measurement_valid']}", flush=True)
             if not point['measurement_valid']: raise RuntimeError('invalid measurement; inspect preserved records/logs')
         report['status'] = 'complete'

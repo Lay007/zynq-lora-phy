@@ -23,7 +23,7 @@
 
 namespace {
 
-constexpr char kFirmwareVersion[] = "0.1.0";
+constexpr char kFirmwareVersion[] = "0.2.0";
 constexpr size_t kMaxPacket = 255;
 constexpr uint32_t kRadioPowerUpDelayMs = 1500;
 
@@ -64,6 +64,7 @@ bool apply(const Profile& p) {
          ok(radio.setBandwidth(p.bandwidthKhz), "setBandwidth") &&
          ok(radio.setSpreadingFactor(p.spreadingFactor), "setSpreadingFactor") &&
          ok(radio.setCodingRate(p.codingRate), "setCodingRate") &&
+         ok(radio.forceLDRO((uint32_t(1) << p.spreadingFactor) / p.bandwidthKhz > 16.0F), "forceLDRO") &&
          ok(radio.setSyncWord(p.syncWord), "setSyncWord") &&
          ok(radio.setPreambleLength(p.preambleSymbols), "setPreambleLength") &&
          ok(radio.setCRC(p.crcEnabled ? 2 : 0), "setCRC") &&
@@ -73,12 +74,14 @@ bool apply(const Profile& p) {
 void printProfile() {
   Serial.printf(
       "PROFILE freq_mhz=%.3f bw_khz=%.1f sf=%u cr=4/%u sync=0x%02X preamble=%u "
-      "crc=%s boost=%s receiving=%s board_revision=%s fem=%s firmware=%s\n",
+      "crc=%s boost=%s receiving=%s board_revision=%s fem=%s firmware=%s ldro=%s rx_packets=%lu\n",
       profile.frequencyMhz, profile.bandwidthKhz, profile.spreadingFactor,
       profile.codingRate, profile.syncWord, profile.preambleSymbols,
       profile.crcEnabled ? "on" : "off", profile.boostedGain ? "on" : "off",
       receiving ? "yes" : "no", board::revisionName(revisionProbe.revision),
-      board::femModeName(revisionProbe.revision), kFirmwareVersion);
+      board::femModeName(revisionProbe.revision), kFirmwareVersion,
+      (uint32_t(1) << profile.spreadingFactor) / profile.bandwidthKhz > 16.0F ? "on" : "off",
+      static_cast<unsigned long>(packetCount));
 }
 
 void startReceiving() {
