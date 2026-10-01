@@ -42,7 +42,7 @@ def analyze(report: dict) -> dict:
                   'usable_unique_toa': len(rows),
                   'toa_rejection_reasons': dict(Counter(reason for r in point['records']
                       for reason in r.get('toa_rejection_reasons', [])))}
-        drop_counts = {r[k] for r in point['records'] if r.get('kind') == 'packet'
+        drop_counts = {r[k] for r in point['records'] if r.get('kind') in ('packet', 'timeout')
                        for k in ('drop_before', 'drop_after') if k in r}
         result['sample_counter_continuity_valid'] = len(drop_counts) <= 1
         result['drop_counter_values'] = sorted(drop_counts)

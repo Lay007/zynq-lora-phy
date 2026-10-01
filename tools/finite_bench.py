@@ -21,6 +21,8 @@ def parse_record(line: str) -> dict:
         record["fields"] = fields
         if parts[0] == "TIMEOUT":
             record.update(kind="timeout", status=int(fields["status"], 0))
+            for name in ('joint', 'clock_status', 'drop_before', 'drop_after'):
+                if name in fields: record[name] = int(fields[name], 0)
             return record
         integers = ("cap", "pbin", "realigned", "n", "p0seq", "p0coarse", "p0frac",
                     "p0status", "p0log", "p0debug", "joint", "clock_status",

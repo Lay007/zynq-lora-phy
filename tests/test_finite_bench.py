@@ -223,3 +223,10 @@ def test_control_outlier_does_not_move_reference_or_disappear():
     assert result['groups']['0.0']['over_one_sample'] == 1
     assert result['groups']['0.0']['count'] == 10
     assert max(s['error_ns'] for s in result['samples']) == pytest.approx(1024000)
+
+
+def test_timeout_retains_acquisition_and_clock_outcomes_without_packet():
+    r = bench.parse_record('TIMEOUT 1000 status=0x53590000 joint=0x4a540200 clock_status=0x434b0001 drop_before=4 drop_after=5')
+    assert r['kind'] == 'timeout' and r['joint'] & 512
+    assert r['drop_before'] == 4 and r['drop_after'] == 5
+    assert not r.get('toa_valid', False)

@@ -57,6 +57,9 @@ fraction, log peak, status/debug, joint status, sample-drop counts, freshness,
 snapshot-change flag and raw trace. ToA eligibility rejects stale/changed
 metadata, mailbox overflow, missing/rejected joint correction and sample drops
 within the attempt. CRC validity and ToA eligibility are separate decisions.
+Timeouts retain acquisition/joint status and drop counters even when no packet
+trace completes. Sticky trigger bits count affected attempts, not every trigger
+or statistically independent FFT window.
 The joint page's correction/up-offset/origin/phase diagnostics are also retained.
 They remain frozen from a previous success on an abort: use
 `joint_diagnostics_valid`, freshness and status before attributing them to a packet.

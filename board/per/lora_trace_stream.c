@@ -130,7 +130,15 @@ int main(int argc, char **argv) {
     if (stop) break;
     if (duration_ms && now_ms() - t0 >= (uint64_t)duration_ms) break;
     if (!((status & 0x200u) && !(status & 0x100u))) {
-      printf("TIMEOUT %" PRIu64 " status=0x%08x\n", now_ms() - t0, status);
+      /* Retain sticky acquisition outcomes even without a complete packet,
+       * including accumulated-preamble triggers on noise-only campaigns. */
+      select_page(JOINT_PAGE);
+      uint32_t timeout_joint = REG(STATUS);
+      select_page(CLOCK_PAGE);
+      uint32_t timeout_clock = REG(STATUS);
+      uint32_t timeout_drop = REG(METRICS) & 0xffffu;
+      printf("TIMEOUT %" PRIu64 " status=0x%08x joint=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u\n",
+             now_ms() - t0, status, timeout_joint, timeout_clock, drop_before, timeout_drop);
       ++got; /* a timeout is an attempt too, so a dead receiver cannot hang the run */
       continue;
     }
