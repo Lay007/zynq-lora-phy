@@ -44,7 +44,8 @@ def analyze(report: dict) -> dict:
                       for reason in r.get('toa_rejection_reasons', [])))}
         drop_counts = {r[k] for r in point['records'] if r.get('kind') in ('packet', 'timeout')
                        for k in ('drop_before', 'drop_after') if k in r}
-        result['sample_counter_continuity_valid'] = len(drop_counts) <= 1
+        result['sample_counter_continuity_valid'] = len(drop_counts) == 1
+        result['sample_counter_continuity_observed'] = bool(drop_counts)
         result['drop_counter_values'] = sorted(drop_counts)
         if len(rows) >= 3:
             # Subtract the integer epoch before conversion, retaining small Q12

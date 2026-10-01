@@ -162,6 +162,8 @@ def test_relative_timing_keeps_subsample_precision_at_large_counter():
     result = analyze(series)['points'][0]
     assert 0 < result['affine_residual_std_ns'] < 20
     assert result['usable_unique_toa'] == 5 and abs(result['clock_scale_ppm']) < 1e-6
+    assert not result['sample_counter_continuity_valid']
+    assert not result['sample_counter_continuity_observed']
 
 
 def test_generator_reports_clipping_instead_of_claiming_zero(generator):
