@@ -23,7 +23,9 @@ module lora_matched_filter_search #(
     parameter integer REF_SAMPLES   = 1024,
     parameter integer SEARCH_RADIUS = 8,
     parameter integer ACC_WIDTH     = 48,
-    parameter integer POWER_SHIFT   = 30
+    parameter integer POWER_SHIFT   = 30,
+    parameter integer REQUEST_ON_RESPONSE = 0,
+    parameter integer COARSE_STRIDE = 1
 ) (
     input  wire                         clk,
     input  wire                         resetn,
@@ -68,7 +70,8 @@ module lora_matched_filter_search #(
     output wire                         peak_restart_error
 );
 
-    localparam integer SEARCH_LAGS = 2*SEARCH_RADIUS + 1;
+    localparam integer SEARCH_LAGS = 2*SEARCH_RADIUS/COARSE_STRIDE + 1;
+    localparam integer REFINE_LAGS = 2*COARSE_STRIDE + 1;
     localparam [63:0] SEARCH_RADIUS_U64 = SEARCH_RADIUS;
 
     localparam [2:0] STATE_IDLE      = 3'd0;
@@ -80,9 +83,13 @@ module lora_matched_filter_search #(
     reg [2:0] state;
     reg [63:0] first_count_reg;
     reg [15:0] lag_index;
+    reg refining;
+    reg [63:0] refine_first_count;
+    reg [15:0] refine_first_index;
 
     wire mac_start = (state == STATE_LAUNCH);
-    wire [63:0] mac_window_start_count = first_count_reg + lag_index;
+    wire [63:0] mac_window_start_count = refining ?
+        refine_first_count + lag_index : first_count_reg + lag_index*COARSE_STRIDE;
     wire mac_busy;
     wire mac_result_valid;
     wire [63:0] mac_result_sample_count;
@@ -92,6 +99,15 @@ module lora_matched_filter_search #(
 
     wire peak_search_start = (state == STATE_ARM_PEAK);
     wire peak_busy_unused;
+    wire [31:0] coarse_before, coarse_peak, coarse_after;
+    wire [15:0] coarse_index;
+    wire [63:0] coarse_count_unused;
+    wire coarse_triplet, coarse_boundary, coarse_restart;
+    wire [31:0] fine_before, fine_peak, fine_after;
+    wire [15:0] fine_index;
+    wire [63:0] fine_count;
+    wire fine_triplet, fine_boundary, fine_restart;
+    wire [63:0] coarse_peak_count = first_count_reg + coarse_index*COARSE_STRIDE;
 
     wire mac_window_mismatch_now =
         (state == STATE_WAIT_MAC) && mac_result_valid &&
@@ -108,8 +124,18 @@ module lora_matched_filter_search #(
     assign correlation_magnitude = mac_correlation_power;
     assign correlation_magnitude_valid = mac_result_valid;
     assign correlation_sample_count = mac_result_sample_count;
+    assign magnitude_before = COARSE_STRIDE == 1 ? coarse_before : fine_before;
+    assign magnitude_peak = COARSE_STRIDE == 1 ? coarse_peak : fine_peak;
+    assign magnitude_after = COARSE_STRIDE == 1 ? coarse_after : fine_after;
+    assign peak_index = COARSE_STRIDE == 1 ? coarse_index : refine_first_index + fine_index;
+    assign peak_sample_count = COARSE_STRIDE == 1 ? coarse_peak_count : fine_count;
+    assign triplet_valid = COARSE_STRIDE == 1 ? coarse_triplet : fine_triplet;
+    assign peak_boundary_error = coarse_boundary || fine_boundary;
+    assign peak_restart_error = coarse_restart || fine_restart;
 
     initial begin
+        if ((COARSE_STRIDE != 1 && COARSE_STRIDE != 2) || SEARCH_RADIUS % COARSE_STRIDE != 0)
+            $error("coarse stride must be 1 or 2 and divide SEARCH_RADIUS");
         if (SEARCH_RADIUS < 1 || SEARCH_RADIUS > 32767)
             $error("lora_matched_filter_search SEARCH_RADIUS must be 1..32767");
         if (SEARCH_LAGS > 65535)
@@ -119,7 +145,8 @@ module lora_matched_filter_search #(
     lora_matched_filter_mac #(
         .REF_SAMPLES(REF_SAMPLES),
         .ACC_WIDTH(ACC_WIDTH),
-        .POWER_SHIFT(POWER_SHIFT)
+        .POWER_SHIFT(POWER_SHIFT),
+        .REQUEST_ON_RESPONSE(REQUEST_ON_RESPONSE)
     ) u_mac (
         .clk(clk),
         .resetn(resetn),
@@ -152,26 +179,47 @@ module lora_matched_filter_search #(
     ) u_peak_capture (
         .clk(clk),
         .resetn(peak_resetn),
-        .search_start(peak_search_start),
+        .search_start(peak_search_start && !refining),
         .search_base_count(first_count_reg),
         .magnitude(mac_correlation_power),
-        .magnitude_valid(mac_result_valid),
-        .magnitude_before(magnitude_before),
-        .magnitude_peak(magnitude_peak),
-        .magnitude_after(magnitude_after),
-        .peak_index(peak_index),
-        .peak_sample_count(peak_sample_count),
-        .triplet_valid(triplet_valid),
+        .magnitude_valid(mac_result_valid && !refining),
+        .magnitude_before(coarse_before),
+        .magnitude_peak(coarse_peak),
+        .magnitude_after(coarse_after),
+        .peak_index(coarse_index),
+        .peak_sample_count(coarse_count_unused),
+        .triplet_valid(coarse_triplet),
         .busy(peak_busy_unused),
-        .boundary_error(peak_boundary_error),
-        .restart_error(peak_restart_error)
+        .boundary_error(coarse_boundary),
+        .restart_error(coarse_restart)
     );
+
+    generate if (COARSE_STRIDE > 1) begin : g_refine
+        // Sparse powers are only a coarse locator. The interpolator receives
+        // a fresh unit-sample triplet from a five-lag local search, never the
+        // two-sample neighbours of the coarse scan. LoRa SF7/L8's main lobe
+        // spans multiple samples; stride 2 must not be used for isolated peaks.
+        lora_peak_triplet_capture #(.SEARCH_SAMPLES(REFINE_LAGS)) u_fine_peak (
+            .clk(clk), .resetn(peak_resetn), .search_start(peak_search_start && refining),
+            .search_base_count(refine_first_count), .magnitude(mac_correlation_power),
+            .magnitude_valid(mac_result_valid && refining),
+            .magnitude_before(fine_before), .magnitude_peak(fine_peak), .magnitude_after(fine_after),
+            .peak_index(fine_index), .peak_sample_count(fine_count), .triplet_valid(fine_triplet),
+            .busy(), .boundary_error(fine_boundary), .restart_error(fine_restart));
+    end else begin : g_no_refine
+        assign fine_before = 0; assign fine_peak = 0; assign fine_after = 0;
+        assign fine_index = 0; assign fine_count = 0; assign fine_triplet = 0;
+        assign fine_boundary = 0; assign fine_restart = 0;
+    end endgenerate
 
     always @(posedge clk) begin
         if (!resetn || stream_reset) begin
             state                     <= STATE_IDLE;
             first_count_reg           <= 64'd0;
             lag_index                 <= 16'd0;
+            refining                  <= 1'b0;
+            refine_first_count        <= 64'd0;
+            refine_first_index        <= 16'd0;
             busy                      <= 1'b0;
             underflow_error           <= 1'b0;
             search_restart_error      <= 1'b0;
@@ -192,6 +240,7 @@ module lora_matched_filter_search #(
                         end else begin
                             first_count_reg <= coarse_start_count - SEARCH_RADIUS_U64;
                             lag_index       <= 16'd0;
+                            refining        <= 1'b0;
                             busy            <= 1'b1;
                             state           <= STATE_ARM_PEAK;
                         end
@@ -219,7 +268,7 @@ module lora_matched_filter_search #(
                             mac_window_mismatch_error <= 1'b1;
                             busy                      <= 1'b0;
                             state                     <= STATE_IDLE;
-                        end else if (lag_index == SEARCH_LAGS-1) begin
+                        end else if (lag_index == (refining ? REFINE_LAGS-1 : SEARCH_LAGS-1)) begin
                             state <= STATE_WAIT_PEAK;
                         end else begin
                             lag_index <= lag_index + 16'd1;
@@ -229,7 +278,13 @@ module lora_matched_filter_search #(
                 end
 
                 STATE_WAIT_PEAK: begin
-                    if (triplet_valid || peak_boundary_error || peak_restart_error) begin
+                    if (!refining && COARSE_STRIDE > 1 && coarse_triplet) begin
+                        refining <= 1'b1;
+                        refine_first_count <= coarse_peak_count - COARSE_STRIDE;
+                        refine_first_index <= coarse_index*COARSE_STRIDE - COARSE_STRIDE;
+                        lag_index <= 16'd0;
+                        state <= STATE_ARM_PEAK;
+                    end else if (triplet_valid || peak_boundary_error || peak_restart_error) begin
                         busy  <= 1'b0;
                         state <= STATE_IDLE;
                     end

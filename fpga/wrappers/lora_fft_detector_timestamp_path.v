@@ -6,7 +6,9 @@
 // The generated correlator remains behind fft_correlator_route_top so the
 // historical generic DUT name and future ModulePrefix regeneration share one
 // integration boundary. All symbol/timestamp sidebands remain cycle-aligned.
-module lora_fft_detector_timestamp_path (
+module lora_fft_detector_timestamp_path #(
+    parameter integer QUALIFY_PREAMBLE_TIMESTAMP = 0
+) (
     input  wire               clk,
     input  wire               resetn,
     input  wire signed [15:0] iq_in_re,
@@ -106,7 +108,9 @@ module lora_fft_detector_timestamp_path (
     // symbol_valid is the actual transaction qualifier. Keeping the generated
     // detector enabled whenever the FFT path is enabled preserves HDL Coder's
     // state-update semantics while allowing arbitrary gaps in valid_in.
-    lora_detector_timestamp_path u_detector_timestamp (
+    lora_detector_timestamp_path #(
+        .QUALIFY_PREAMBLE_TIMESTAMP(QUALIFY_PREAMBLE_TIMESTAMP)
+    ) u_detector_timestamp (
         .clk(clk),
         .resetn(resetn),
         .clk_enable(fft_ce_out),
