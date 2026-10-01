@@ -28,7 +28,9 @@ def test_duplicates_crc_failure_and_payload_validation():
     r=summary([record(10,1),record(10,2),record(11,3,'crc')])
     assert r['measurement_valid'] and r['received_unique']==1 and r['duplicates']==1 and r['crc_fail']==1
     bad=bytearray(payload(12)); bad[-1]^=1
-    assert not summary([record(12,1,data=bytes(bad))])['measurement_valid']
+    corrupt = summary([record(12,1,data=bytes(bad))])
+    assert corrupt['measurement_valid'] and corrupt['payload_mismatches'] == 1
+    assert corrupt['received_unique'] == 0 and corrupt['per'] == 1
     assert not summary([record(100,1)])['measurement_valid']
 
 @pytest.mark.parametrize('records,final', [([record(10,2)],2),([record(10,1)],2),([],1)])

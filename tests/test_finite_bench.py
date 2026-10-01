@@ -76,7 +76,41 @@ def test_timeout_status_is_preserved():
 
 
 def packet(seq):
-    return dict(kind='packet', capture_valid=True, crc=True, seq=seq, cap=seq, toa_valid=True)
+    from lora_per_ideal import test_payload
+    return dict(kind='packet', capture_valid=True, crc=True, seq=seq, cap=seq, toa_valid=True,
+                payload_hex=test_payload(seq).hex())
+
+
+def test_undetected_crc_error_is_a_packet_loss_not_a_failed_trial():
+    r = packet(12)
+    bad = bytearray.fromhex(r['payload_hex'])
+    bad[-1] ^= 0x80
+    r['payload_hex'] = bad.hex()
+    result = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert result['measurement_valid'] and result['received_unique'] == 0
+    assert result['per'] == 1 and result['payload_mismatches'] == 1
+
+
+def test_missing_payload_validation_cannot_claim_a_qualified_per():
+    r = packet(12)
+    del r['payload_hex']
+    result = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert not result['measurement_valid'] and result['per'] is None
+    assert result['unvalidated_payload_records'] == 1
+
+
+def test_corrupt_payload_timestamp_is_excluded_from_repeatability():
+    rows = [dict(packet(i), toa_samples_q12=i * 100 * 4096) for i in range(4)]
+    bad = bytearray.fromhex(rows[3]['payload_hex'])
+    bad[-1] ^= 0x80
+    rows[3]['payload_hex'] = bad.hex()
+    summary = bench.summarize(rows, 0, 4, tx_complete=True, collection_complete=True)
+    point = dict(summary, snr_db=20, records=rows)
+    result = analyze({'schema': 'finite-per-v1',
+        'configuration': dict(tx_rate=1e6, gap=0, first_sequence=0, packets=4),
+        'samples_per_packet': 100, 'points': [point]})['points'][0]
+    assert result['usable_unique_toa'] == 3
+    assert [r['seq'] for r in result['samples']] == [0, 1, 2]
 
 
 def test_exact_denominator_includes_leading_trailing_and_long_losses():

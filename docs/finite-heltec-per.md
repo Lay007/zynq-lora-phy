@@ -49,6 +49,14 @@ are buffered until a complete line arrives. CRC failures remain records.
 Zero received RF packets is a valid PER=1 point if TX and serial collection
 completed. A failed/interrupted transmitter produces no PER.
 
+The PL trace decoder requires a payload-CRC-enabled header before ranking
+hypotheses; a noisy header that disables CRC cannot bypass this policy.
+Both PL and serial collectors compare the full payload to the planned
+32-byte `ZLP1` frame. A CRC-valid frame with a known ID but corrupted content
+is a packet error, not a successful reception or an acquisition failure.
+Its timestamp is excluded from ToA repeatability. PL summaries made from
+older parsed records without payload bytes must be regenerated from raw traces.
+
 Long SF12 waveforms need small batches: templates are uploaded to the board's
 RAM filesystem. The harness checks batch size and available space before TX.
 Use distinct `--first-sequence` ranges and preserve each finite batch before
