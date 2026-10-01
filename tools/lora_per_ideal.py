@@ -13,9 +13,12 @@ rate equal to BW, so the noise bandwidth equals the LoRa bandwidth and the
 numbers compare directly with SX126x datasheet SNR limits. The packet is the
 Heltec test packet: 32 bytes, explicit header, payload CRC on; low data rate
 optimisation is on for SF11 and SF12 at 125 kHz, as the LoRa specification
-requires. BW itself does not appear: at one sample per chip the baseband model
-is identical for every bandwidth, only the time scale and the absolute
-sensitivity (noise power 10*log10(BW) dB) change.
+requires. At one sample per chip, bandwidth changes time scale and noise power.
+It also changes LDRO at SF11/12; curves coincide only with the same setting.
+The optional exact-decision sampler draws the correct Rician FFT bin and the
+maximum of the M-1 independent Rayleigh bins directly. It has the same decision
+distribution as waveform FFT simulation in this perfectly synchronized AWGN
+model, without generating waveform samples.
 
     python tools/lora_per_ideal.py --sf 7 8 9 10 11 12 --cr 1 2 3 4 \\
         --packets 1000 --out docs/data/lora_per_ideal.json
@@ -24,6 +27,8 @@ sensitivity (noise power 10*log10(BW) dB) change.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -71,18 +76,41 @@ def symbol_error_matrix(symbols: np.ndarray, sf: int, snr_db: float,
     return np.argmax(np.abs(np.fft.fft(rx, axis=2)), axis=2)
 
 
-def run_point(args: tuple[int, int, float, int, int]) -> dict[str, float]:
-    sf, cr, snr_db, packets, seed = args
+def exact_decision_matrix(symbols: np.ndarray, sf: int, snr_db: float,
+                          rng: np.random.Generator) -> np.ndarray:
+    """Sample the exact noncoherent orthogonal-tone decision law in AWGN.
+
+    Normalize each FFT noise bin to E[|w|^2]=1. The correct bin has amplitude
+    sqrt(M*SNR); wrong-bin powers are independent unit exponential variables.
+    Their maximum has CDF (1-exp(-x))**(M-1). Conditional on an error, the
+    winning wrong bin is uniform over the M-1 alternatives by symmetry.
+    """
+    m = 1 << sf
+    correct = np.abs(np.sqrt(m * 10.0**(snr_db/10.0)) +
+                     (rng.standard_normal(symbols.shape) +
+                      1j*rng.standard_normal(symbols.shape))/np.sqrt(2.0))**2
+    u = np.maximum(rng.random(symbols.shape), np.finfo(float).tiny)
+    maximum_wrong = -np.log(-np.expm1(np.log(u)/(m-1)))
+    offset = rng.integers(1, m, size=symbols.shape)
+    return np.where(correct > maximum_wrong, symbols, (symbols + offset) % m)
+
+
+def run_point(args: tuple) -> dict:
+    sf, cr, snr_db, packets, seed = args[:5]
+    bw, demodulator = args[5:] if len(args) > 5 else (125.0, 'waveform-fft')
     rng = np.random.default_rng(seed)
-    ldro = ldro_required(sf)
+    ldro = ldro_required(sf, bw)
     payloads = [test_payload(seed * 7919 + p) for p in range(packets)]
     encoded = [encode_lora_packet(p, spreading_factor=sf, coding_rate=cr,
                                   low_data_rate_optimization=ldro).symbols for p in payloads]
     length = len(encoded[0])
     sent = np.array(encoded, dtype=np.int64)
     # In batches: SF12 x 1000 packets x 64 symbols x 4096 samples is 4 GB.
-    got = np.concatenate([symbol_error_matrix(sent[i:i + 50], sf, snr_db, rng)
-                          for i in range(0, packets, 50)])
+    if demodulator == 'exact-decision':
+        got = exact_decision_matrix(sent, sf, snr_db, rng)
+    else:
+        got = np.concatenate([symbol_error_matrix(sent[i:i + 50], sf, snr_db, rng)
+                              for i in range(0, packets, 50)])
     ok = 0
     for i in range(packets):
         result = decode_lora_packet(got[i].tolist(), spreading_factor=sf,
@@ -90,7 +118,9 @@ def run_point(args: tuple[int, int, float, int, int]) -> dict[str, float]:
         if result.success and result.crc_valid and bytes(result.payload) == payloads[i]:
             ok += 1
     return {
-        "sf": sf, "cr": cr, "snr_db": snr_db, "packets": packets,
+        "sf": sf, "cr": cr, "bw_khz": bw, "ldro": ldro,
+        "demodulator": demodulator, "seed": seed,
+        "snr_db": snr_db, "packets": packets, "packet_errors": packets-ok,
         "per": 1.0 - ok / packets,
         "ser": float(np.mean(got != sent)),
         "symbols_per_packet": length,
@@ -108,18 +138,37 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--sf", type=int, nargs="+", default=[7])
     ap.add_argument("--cr", type=int, nargs="+", default=[1], help="1..4 for 4/5..4/8")
+    ap.add_argument("--bw", type=float, nargs="+", default=[125.0], help="bandwidths in kHz")
+    ap.add_argument("--demodulator", choices=['waveform-fft', 'exact-decision'], default='waveform-fft')
     ap.add_argument("--packets", type=int, default=1000)
     ap.add_argument("--step", type=float, default=0.5)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
+    if (not all(7 <= sf <= 12 for sf in args.sf) or
+            not all(1 <= cr <= 4 for cr in args.cr) or
+            not all(bw in (125.0, 250.0, 500.0) for bw in args.bw) or
+            args.packets < 1 or args.step <= 0 or not np.isfinite(args.step) or args.workers < 1):
+        ap.error('requires SF7..12, CR1..4, BW125/250/500, positive packets/step/workers')
+    if args.out.exists():
+        ap.error('output exists; choose a new path')
 
-    jobs = [(sf, cr, snr, args.packets, 1000 * sf + 100 * cr + i)
-            for sf in args.sf for cr in args.cr for i, snr in enumerate(snr_grid(sf, args.step))]
+    # Equal normalized profiles share a simulation, not independent trials.
+    profiles = {}
+    for sf in sorted(set(args.sf)):
+        for cr in sorted(set(args.cr)):
+            for bw in sorted(set(args.bw)):
+                profiles.setdefault((sf, cr, ldro_required(sf, bw)), []).append(bw)
+    jobs = [(sf, cr, snr, args.packets, 1000*sf+100*cr+i+100000*ldro,
+             bws[0], args.demodulator)
+            for (sf, cr, ldro), bws in profiles.items()
+            for i, snr in enumerate(snr_grid(sf, args.step))]
     rows = []
     with ProcessPoolExecutor(args.workers) as pool:
         for row in pool.map(run_point, jobs):
-            rows.append(row)
+            for bw in profiles[(row['sf'], row['cr'], row['ldro'])]:
+                rows.append(dict(row, bw_khz=bw,
+                                 normalized_model_id=f"sf{row['sf']}-cr{row['cr']}-ldro{int(row['ldro'])}"))
             print(f"SF{row['sf']} CR4/{row['cr'] + 4} SNR {row['snr_db']:+6.1f} dB  "
                   f"PER {row['per']:.4f}  SER {row['ser']:.4f}", flush=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -127,6 +176,10 @@ def main() -> int:
         "description": "ideal LoRa PER/SER vs SNR in the signal bandwidth (Monte Carlo, "
                        "perfect timing, no CFO, non-coherent FFT decision, project decoder)",
         "payload_bytes": PAYLOAD_LENGTH, "explicit_header": True, "payload_crc": True,
+        "demodulator": args.demodulator, "independent_normalized_profiles": len(profiles),
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "bandwidth_note": "equal SF/CR/LDRO reuse one normalized AWGN trial set; not independent measurements",
         "rows": rows}, indent=1) + "\n", encoding="utf-8")
     return 0
 

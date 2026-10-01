@@ -69,13 +69,19 @@ def packet_waveform(payload: bytes, sf: int, bw_hz: float, cr: int, fs: float = 
     return np.concatenate(parts)
 
 
-def bandlimited_noise(count: int, rng: np.random.Generator) -> np.ndarray:
-    """Unit-density complex noise, flat inside +/-NOISE_EDGE_HZ, zero outside."""
+def noise_edge(bw_hz: float) -> float:
+    """Keep the noise flat across the signal BW, including the BW500 profile."""
+    return max(NOISE_EDGE_HZ,0.6*bw_hz)
+
+
+def bandlimited_noise(count: int, rng: np.random.Generator,
+                      edge_hz: float = NOISE_EDGE_HZ) -> np.ndarray:
+    """Unit-density complex noise, flat inside +/-edge_hz, zero outside."""
 
     w = rng.standard_normal(count) + 1j * rng.standard_normal(count)
     spec = np.fft.fft(w)
     freqs = np.fft.fftfreq(count, 1 / SAMPLE_RATE)
-    spec[np.abs(freqs) > NOISE_EDGE_HZ] = 0
+    spec[np.abs(freqs) > edge_hz] = 0
     return np.fft.ifft(spec)  # per-sample variance 2 * (2*edge/fs) over the band
 
 
@@ -94,7 +100,7 @@ def build(sf: int, bw_khz: float, cr: int, snr_db: float, packets: int, gap_s: f
     signal = np.concatenate(pieces)  # unit amplitude during packets
     # SNR in BW: signal power 1; noise density N0 with N0 * BW = 10^(-SNR/10).
     n0 = 10.0 ** (-snr_db / 10.0) / bw_hz
-    noise = bandlimited_noise(signal.size, rng)
+    noise = bandlimited_noise(signal.size, rng, noise_edge(bw_hz))
     unit_density = 2.0 / SAMPLE_RATE  # density of the raw N(0,1)+jN(0,1) noise
     noise *= np.sqrt(n0 / unit_density)
     x = signal + noise
@@ -148,7 +154,7 @@ def main() -> int:
     iq.tofile(args.out)
     sidecar = {
         "sf": args.sf, "bw_khz": args.bw, "cr": args.cr, "coding_rate": f"4/{args.cr + 4}",
-        "snr_db_in_bw": args.snr, "sample_rate": SAMPLE_RATE, "noise_edge_hz": NOISE_EDGE_HZ,
+        "snr_db_in_bw": args.snr, "sample_rate": SAMPLE_RATE, "noise_edge_hz": noise_edge(args.bw*1e3),
         "preamble": PREAMBLE, "sync_word": SYNC_WORD, "payload_bytes": 32,
         "ldro": ldro_required(args.sf, args.bw), "rms_dbfs": args.rms_dbfs,
         "samples": int(x.size), "seconds": x.size / SAMPLE_RATE, "packets": meta,
