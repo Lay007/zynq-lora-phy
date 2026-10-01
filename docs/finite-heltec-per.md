@@ -1,9 +1,17 @@
-# Finite ZynqSDR to Heltec V4 trials
+# Finite ZynqSDR to Heltec V4 or LilyGO LR1121 trials
 
 Use `firmware/heltec-v4-sx1262-rx` on the ESP32-S3/SX1262 Heltec V4.
 Version 0.2.0 prints the selected LDRO state and `rx_packets` in `PROFILE`.
 LDRO is explicitly set after SF/BW/CR, so source and receiver use the same
 packet geometry. The host verifies the profile before transmitting.
+
+The same serial protocol is provided by
+`firmware/lilygo-t3s3-lr1121-rx` version 0.2.0 for the standard T3-S3 LR1121
+board. This version explicitly selects LDRO after changing SF/BW/CR and
+reports `rx_packets`, including CRC failures, in `PROFILE`. Use the Sub-GHz
+RF path for 868.1 MHz. Build/upload from that firmware directory and replace
+the example COM port with the actual LilyGO port. Verify the board revision
+and RF-switch wiring before using this firmware on an external-PA variant.
 
 Connect ZynqSDR TX1 through the bench's attenuators to the Heltec RF input;
 connect Heltec USB to the host. Keep the RF profile and attenuation in the
