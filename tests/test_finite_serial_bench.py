@@ -24,6 +24,36 @@ def test_losses_at_both_edges_are_in_denominator():
 def test_total_rf_loss_remains_a_valid_measurement():
     assert summary([])['per']==1
 
+def test_conducted_delivery_counts_unknown_outputs_without_adding_successes():
+    # Observed LR1121 readData-success outputs: empty or a four-byte prefix
+    # followed by a truncated planned payload. Preserve them as unknown outputs.
+    shifted = b'\0'*4 + payload(12)[:-4]
+    rows = [record(10,1), record(11,2,data=b''), record(12,3,data=shifted)]
+    assert not summary(rows)['measurement_valid']
+    r = summary(rows,allow_unrecognized_rx=True)
+    assert r['measurement_valid'] and r['received_unique']==1
+    assert r['foreign_packets']==2 and r['per']==pytest.approx(.8)
+    assert not summary(rows,allow_unrecognized_rx=True,final_counter=4)['measurement_valid']
+    assert not summary(rows,allow_unrecognized_rx=True,tx_complete=False)['measurement_valid']
+
+@pytest.mark.parametrize('metadata', [
+    'header_crc=off header_code=0 rx_done=1',
+    'header_crc=unknown header_code=-2 rx_done=1',
+    'header_crc=on header_code=0 rx_done=0',
+])
+def test_lr1121_crc_and_rx_done_metadata_are_required_when_reported(metadata):
+    data=payload(10)
+    r=parse_rx(f'RX n=1 state=0 code=0 len={len(data)} rssi=-90 snr=-7 ferr=0 '
+               f'{metadata} payload={data.hex()}')
+    assert not r['crc_valid']
+    assert summary([r])['received_unique']==0
+
+def test_lr1121_protected_rx_done_preserves_planned_success():
+    data=payload(10)
+    r=parse_rx(f'RX n=1 state=0 code=0 len={len(data)} rssi=-90 snr=-7 ferr=0 '
+               f'header_crc=on header_code=0 rx_done=1 irq=0x38 buffer_offset=4 payload={data.hex()}')
+    assert r['crc_valid'] and summary([r])['received_unique']==1
+
 def test_duplicates_crc_failure_and_payload_validation():
     r=summary([record(10,1),record(10,2),record(11,3,'crc')])
     assert r['measurement_valid'] and r['received_unique']==1 and r['duplicates']==1 and r['crc_fail']==1

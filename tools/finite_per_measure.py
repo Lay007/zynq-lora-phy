@@ -176,6 +176,8 @@ def main() -> int:
     parser.add_argument('--restore-profile', action='store_true')
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--templates', type=Path, help='prebuilt uniquely numbered complex64 templates and .json sidecar')
+    parser.add_argument('--allow-unrecognized-rx', action='store_true',
+                        help='controlled conducted serial delivery test: retain unknown outputs as errors; require exact planned payloads')
     args = parser.parse_args()
     if ((args.receiver == 'pl' and (args.sf != 7 or args.bw != 125))
             or not 7 <= args.sf <= 12 or args.bw not in (125,250,500)

@@ -38,13 +38,20 @@ def parse_rx(line):
     count = int(f['n'])
     if count < 1 or f['state'] not in ('0','crc','other'):
         raise ValueError('invalid RX counter/state')
-    return {'rx_count':count, 'crc_valid':f['state']=='0' and int(f['code'])==0,
+    header_crc = f.get('header_crc')
+    rx_done = f.get('rx_done')
+    metadata_ok = (header_crc is None or (header_crc == 'on' and int(f.get('header_code', '-1')) == 0))
+    metadata_ok = metadata_ok and (rx_done is None or rx_done == '1')
+    return {'rx_count':count, 'crc_valid':f['state']=='0' and int(f['code'])==0 and metadata_ok,
+            'header_crc':header_crc, 'rx_done':rx_done,
+            'irq':f.get('irq'), 'buffer_offset':f.get('buffer_offset'),
             'state':f['state'], 'payload_hex':payload.hex(),
             'sequence':bench.seq_of(payload), 'rssi_dbm':float(f['rssi']),
             'snr_db':float(f['snr']), 'frequency_error_hz':float(f['ferr'])}
 
 
-def summarize_serial(records, first, packets, final_counter, *, tx_complete, collection_complete):
+def summarize_serial(records, first, packets, final_counter, *, tx_complete, collection_complete,
+                     allow_unrecognized_rx=False):
     ids, duplicates, foreign, corrupt, crc_fail = set(), 0, 0, 0, 0
     for r in records:
         if not r['crc_valid']:
@@ -63,11 +70,16 @@ def summarize_serial(records, first, packets, final_counter, *, tx_complete, col
     transport_complete = (counters == list(range(1,len(records)+1)) and final_counter == len(records))
     # A known ID with corrupted content is an RF packet error, even if its
     # CRC passed. Preserve the event and count the planned ID as lost.
-    valid = bool(tx_complete and collection_complete and transport_complete and not foreign)
+    # In a controlled conducted delivery test, unknown/empty radio outputs
+    # cannot create successful planned IDs. Count them separately while keeping
+    # the entire planned denominator. The default still rejects foreign traffic.
+    valid = bool(tx_complete and collection_complete and transport_complete
+                 and (not foreign or allow_unrecognized_rx))
     return {'measurement_valid':valid, 'per':1-len(ids)/packets if valid else None,
             'planned_packets':packets, 'received_unique':len(ids), 'usable_toa':0,
             'lost':packets-len(ids), 'crc_fail':crc_fail, 'duplicates':duplicates,
             'foreign_packets':foreign, 'payload_mismatches':corrupt,
+            'unrecognized_rx_allowed':allow_unrecognized_rx,
             'serial_transport_complete':transport_complete, 'tx_complete':tx_complete,
             'collection_complete':collection_complete,
             'missing_sequences':[n for n in range(first,first+packets) if n not in ids]}
@@ -157,7 +169,8 @@ def measure_serial(c,args,prefix,spp,snr,seed,checkpoint,start_tx,generator_summ
                       point['tx_elapsed_s'] >= (lead+args.packets*(spp+gap)-gap)/args.tx_rate-1)
             point.update(summarize_serial(point['records'],args.first_sequence,args.packets,
                          int(point['final_receiver_profile']['rx_packets']),
-                         tx_complete=complete,collection_complete=True))
+                         tx_complete=complete,collection_complete=True,
+                         allow_unrecognized_rx=args.allow_unrecognized_rx))
             point['status']='complete' if point['measurement_valid'] else 'invalid'
         point['raw_trace']=raw.name
         point['raw_trace_sha256']=hashlib.sha256(raw.read_bytes()).hexdigest()
