@@ -4,6 +4,8 @@ import numpy as np
 parser=argparse.ArgumentParser(description="Real-density SF7/BW125 full-packet joint ToA/CFO RTL regression")
 parser.add_argument('--out',type=Path,required=True)
 parser.add_argument('--jobs',type=int,default=4)
+parser.add_argument('--extra-source', action='append', default=[],
+                    help='Additional RTL source relative to the source tree')
 args=parser.parse_args()
 tree=Path(__file__).resolve().parents[1]
 out=args.out.resolve()
@@ -23,6 +25,11 @@ sources += ['fpga/wrappers/'+name+'.v' for name in (
  'lora_matched_filter_search','lora_joint_chirp_grid_controller','lora_symbol_grid_resync',
  'lora_timestamp_metadata_join','lora_axi_lite_status','lora_packet_toa_receiver_top')]
 sources += ['fpga/tb/tb_replay_detect.sv']
+for name in args.extra_source:
+    path=(tree/name).resolve()
+    if not path.is_relative_to(tree) or not path.is_file():
+        parser.error('extra source must be an existing file in the source tree')
+    sources.append(str(path.relative_to(tree)))
 directory=out/'simulator'
 cmd=['verilator','--binary','--timing','-j',str(args.jobs),'-Wno-fatal',
      '--unroll-count','4096','--unroll-stmts','1000000',
@@ -34,15 +41,20 @@ with (out/'build.log').open('w') as log:
 result.check_returncode(); print('Full packet simulator compiled',flush=True)
 rows=[]
 payload=test_payload(1234)
-for phase,cfo,preamble in [(508,1500,8),(512,1500,12),(0,0,8),(0,1500,8),(296,-1500,8),
-                           (512,-1500,8),(511,-1500,12),(700,1500,12),(1023,-1500,12)]:
+cases=[(508,1500,8,0),(512,1500,12,0),(0,0,8,0),(0,1500,8,0),(296,-1500,8,0),
+       (512,-1500,8,0),(511,-1500,12,0),(700,1500,12,0),(1023,-1500,12,0),
+       (508,418,8,.25),(511,-418,8,.5),(512,1000,12,.75),(1023,-1000,12,.25)]
+for phase,cfo,preamble,fraction in cases:
     clean=packet_waveform(payload,7,125000,1)
     if preamble==8: clean=clean[4*1024:]
     lead=2048+phase
     x=np.pad(clean,(lead,2048))
+    if fraction:
+        # Bandlimited fractional translation with zero guards at both edges.
+        x=np.fft.ifft(np.fft.fft(x)*np.exp(-2j*np.pi*np.fft.fftfreq(len(x))*fraction))
     x=x*np.exp(2j*np.pi*cfo/1e6*np.arange(len(x)))*400
     words=((np.rint(x.real).astype(np.int64)&65535)<<16)|(np.rint(x.imag).astype(np.int64)&65535)
-    name=f'phase{phase}-cfo{cfo}-L{preamble}'
+    name=f'phase{phase}-cfo{cfo}-L{preamble}-frac{fraction:g}'
     hexfile=out/(name+'.hex'); hexfile.write_text('\n'.join(f'{v:08x}' for v in words)+'\n')
     started=time.monotonic()
     result=subprocess.run([str(directory/'Vtb_replay_detect'),f'+iq={hexfile}',f'+n={len(x)}',
@@ -60,10 +72,10 @@ for phase,cfo,preamble in [(508,1500,8),(512,1500,12),(0,0,8),(0,1500,8),(296,-1
     if not meta or not latency: raise RuntimeError('missing joint completion: '+name)
     total,down,fine_n,estimate=map(int,latency.groups())
     detection_clocks=int(re.search(r'detection_to_fine_clocks=(\d+)',result.stdout).group(1))
-    expected_origin=lead+(preamble-8)*1024
+    expected_origin=lead+fraction+(preamble-8)*1024
     coarse,frac=map(int,meta[0]); error=coarse+frac/4096-expected_origin
     header_start=lead+int((preamble+4.25)*1024)
-    row={'phase':phase,'cfo_hz':cfo,'preamble_symbols':preamble,
+    row={'phase':phase,'cfo_hz':cfo,'preamble_symbols':preamble,'fractional_delay':fraction,
          'crc_valid':bool(decoded.crc_valid),'payload_match':bytes(decoded.payload)==payload,
          'toa_error_samples':error,'joint_clocks':total,'down_to_fine_clocks':down,
          'prefetch_span_us_including_rf_wait':total/62.5,'fine_sample_count':fine_n,'header_start_sample':header_start,
