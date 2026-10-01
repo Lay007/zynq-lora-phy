@@ -7,6 +7,7 @@ module tb_lora_joint_prefetch;
     reg [15:0] chips=0, pre_chips=0;
     reg triplet=0, frac_valid=0, failed=0;
     reg [63:0] peak=0;
+    reg [31:0] power=100;
     wire start, down, busy, fine, precise, restart;
     wire [63:0] coarse, toa;
     wire [31:0] skip;
@@ -19,6 +20,7 @@ module tb_lora_joint_prefetch;
         .preamble_chips_to_boundary(pre_chips),.history_next_sample_count(history_count),
         .search_busy(1'b0),.search_failed(failed),.search_triplet_valid(triplet),
         .search_peak_sample_count(peak),.search_offset_q12(16'sd0),.search_offset_valid(frac_valid),
+        .search_peak_power(power),
         .search_start(start),.search_coarse_start(coarse),.reference_down(down),
         .busy(busy),.fine_skip(skip),.fine_resync_valid(fine),
         .precise_correction_applied(precise),.toa_coarse(toa),.restart_error(restart));
@@ -99,6 +101,20 @@ module tb_lora_joint_prefetch;
         @(negedge clk); stream_reset=1; @(negedge clk); stream_reset=0;
         repeat(3) @(negedge clk);
         if(busy || fine_count!=5) $fatal(1,"reset retained prefetch state");
+        // A half-symbol FFT tie names a preamble one symbol early. Its weak
+        // SFD is rejected; the following full SFD resolves the absolute epoch.
+        preamble(2048,64); wait_search(0,2560); respond(2556);
+        packet(2048,64,0); wait_search(1,11776);
+        power=1;respond(11764);power=100;
+        wait_search(1,12800);respond(12796);result(2556,12);
+        if(fine_count!=6) $fatal(1,"ambiguous epoch retry failed");
+        // Neither candidate has a credible SFD: return only the guard.
+        preamble(2048,64);wait_search(0,2560);respond(2556);
+        packet(2048,64,0);wait_search(1,11776);
+        power=1;respond(11764);wait_search(1,12800);respond(12796);
+        repeat(4) @(negedge clk);power=100;
+        if(busy || precise || fine_count!=7 || skip!=16)
+            $fatal(1,"two weak SFD candidates did not decline precise ToA");
         $display("PASS tb_lora_joint_prefetch searches=%0d fine=%0d",searches,fine_count); $finish;
     end
     initial begin #100000; $fatal(1,"prefetch test timeout"); end

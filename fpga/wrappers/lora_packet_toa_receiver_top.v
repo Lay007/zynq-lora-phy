@@ -394,6 +394,7 @@ module lora_packet_toa_receiver_top #(
                 .search_failed(raw_search_failure),
                 .search_triplet_valid(raw_peak_triplet_valid),
                 .search_peak_sample_count(peak_sample_count),
+                .search_peak_power(magnitude_peak),
                 .search_offset_q12(toa_offset_q12[15:0]),
                 .search_offset_valid(toa_offset_valid),
                 .search_start(joint_search_start),

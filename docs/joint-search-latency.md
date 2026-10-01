@@ -3,6 +3,13 @@
 The early-sync path can confirm a packet one FFT window late. Its flag now
 selects the preceding chirp origin even when CFO moves the phase below half
 a symbol. This prevents a one-symbol ToA error that CRC alone cannot detect.
+Near half a symbol, FFT-bin quantization can still name the preceding chirp.
+With prefetch enabled the first SFD candidate must have at least half the
+interior upchirp's peak power. A weaker or failed first candidate retries
+exactly one symbol later, using the same MAC. Two weak candidates decline
+precise ToA and return the withheld guard. The power comparison assumes a
+channel whose amplitude stays approximately constant across the preamble/SFD;
+fast fading and noise performance require RF qualification.
 
 Three optional receiver parameters reduce search latency. Their defaults
 preserve the existing serial search and resource architecture:
@@ -44,14 +51,17 @@ Run the full-packet regression on Linux with Verilator and the package installed
 python tools/joint_packet_regression.py --out build/joint-full-packet
 ```
 
-Nine complete, noise-free standard packets exercise both CFO signs at
-1500 Hz, arrival phases around the half-symbol boundary, and preambles of
-8/12 symbols. Samples arrive every alternating 62/63 clocks, matching
+Seventeen complete, noise-free standard packets exercise both CFO signs at
+418/1000/1500 Hz, fractional delays of 0.25/0.5/0.75 sample, arrival phases
+around the half-symbol boundary, and preambles of 8/12 symbols.
+Samples arrive every alternating 62/63 clocks, matching
 1 MS/s at a 62.5 MHz PL clock. Checks include decoded CRC, exact payload,
 ToA error below half a sample, and completion more than 96 samples before
 the header (the maximum guarded resync advance).
 
-The down-search launch-to-fine delay is 55,613 clocks, or 889.808 microseconds.
+An ordinary down-search launch-to-fine delay is 55,613 clocks, or
+889.808 microseconds. A retried epoch takes longer; the per-case record includes
+both searches and any wait for the later SFD samples.
 The total prefetch span includes waiting for RF samples and sync confirmation;
 it is not a compute-only latency. Detection-to-fine and remaining header margin
 are reported separately. The ToA epoch is the first of the retained eight

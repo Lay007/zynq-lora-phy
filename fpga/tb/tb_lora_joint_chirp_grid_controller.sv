@@ -69,6 +69,7 @@ module tb_lora_joint_chirp_grid_controller;
         .search_failed(search_failed),
         .search_triplet_valid(search_triplet_valid),
         .search_peak_sample_count(search_peak_sample_count),
+        .search_peak_power(32'd100),
         .search_offset_q12(search_offset_q12),
         .search_offset_valid(search_offset_valid),
         .search_start(search_start),

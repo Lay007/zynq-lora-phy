@@ -200,6 +200,7 @@ module tb_lora_joint_chirp_grid_path;
         .search_busy(search_busy), .search_failed(search_failed),
         .search_triplet_valid(triplet_valid),
         .search_peak_sample_count(peak_sample_count),
+        .search_peak_power(32'd100),
         .search_offset_q12(toa_offset_q12[15:0]),
         .search_offset_valid(toa_offset_valid),
         .search_start(search_start),

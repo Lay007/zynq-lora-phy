@@ -53,6 +53,7 @@ module lora_joint_chirp_grid_controller #(
     input  wire               search_failed,
     input  wire               search_triplet_valid,
     input  wire [63:0]        search_peak_sample_count,
+    input  wire [31:0]        search_peak_power,
     // Sub-sample refinement for the integer peak above, from the same
     // generated ToA interpolator the legacy single-search path already uses.
     // Q12 (1/4096 sample), range +/-2048 (+/-0.5 sample); one search_offset_valid
@@ -155,6 +156,10 @@ module lora_joint_chirp_grid_controller #(
     reg prefetch_valid;
     reg [63:0] confirmed_up_count;
     reg [63:0] prefetch_expiry_count;
+    reg [31:0] up_peak_power;
+    reg [31:0] down_peak_power;
+    reg epoch_retry_allowed;
+    reg epoch_retried;
     localparam integer PHASE_BITS = SYMBOL_SAMPLES > 1 ? $clog2(SYMBOL_SAMPLES) : 1;
 
     assign diag_up_coarse_start = up_coarse_start;
@@ -175,6 +180,14 @@ module lora_joint_chirp_grid_controller #(
     wire coarse_wraps = !packet_straddle
         && ((packet_early_sync === 1'b1) ||
             (coarse_chip_advance >= (SYMBOL_SAMPLES_U64 / 2)));
+    // Near half a symbol, quantized FFT bins can select a candidate one
+    // symbol early. Qualify its SFD against the interior upchirp and retry
+    // exactly one symbol later if it is weak or missing, on the same MAC.
+    wire packet_epoch_ambiguous = PREFETCH_UP && !packet_straddle &&
+        coarse_chip_advance >= SYMBOL_SAMPLES_U64/2 - SEARCH_RADIUS_U64 &&
+        coarse_chip_advance <= SYMBOL_SAMPLES_U64/2 + SEARCH_RADIUS_U64;
+    wire down_epoch_weak = up_peak_power != 0 && down_peak_power < (up_peak_power >> 1);
+    wire retry_down_epoch = epoch_retry_allowed && !epoch_retried;
     wire signed [64:0] coarse_phase_samples =
         coarse_wraps
         ? $signed({1'b0, coarse_chip_advance}) - $signed({1'b0, SYMBOL_SAMPLES_U64})
@@ -303,6 +316,10 @@ module lora_joint_chirp_grid_controller #(
             prefetch_valid            <= 1'b0;
             confirmed_up_count        <= 64'd0;
             prefetch_expiry_count     <= 64'd0;
+            up_peak_power             <= 32'd0;
+            down_peak_power           <= 32'd0;
+            epoch_retry_allowed       <= 1'b0;
+            epoch_retried             <= 1'b0;
         end else begin
             search_start       <= 1'b0;
             fine_resync_valid  <= 1'b0;
@@ -317,6 +334,8 @@ module lora_joint_chirp_grid_controller #(
                 if (speculative && !confirmed) begin
                     confirmed <= 1'b1;
                     confirmed_up_count <= packet_chirp_start[63:0];
+                    epoch_retry_allowed <= packet_epoch_ambiguous;
+                    epoch_retried <= 1'b0;
                 end else restart_error <= 1'b1;
             end
 
@@ -325,6 +344,8 @@ module lora_joint_chirp_grid_controller #(
                     if (packet_start_valid) begin
                         speculative <= 1'b0;
                         confirmed <= 1'b1;
+                        epoch_retry_allowed <= packet_epoch_ambiguous;
+                        epoch_retried <= 1'b0;
                         up_coarse_start <= packet_chirp_start[63:0];
                         down_coarse_start <= packet_chirp_start[63:0]
                             + PREAMBLE_TO_SFD_SYMBOLS * SYMBOL_SAMPLES_U64;
@@ -379,6 +400,7 @@ module lora_joint_chirp_grid_controller #(
                         end else state <= STATE_IDLE;
                     end else if (search_triplet_valid) begin
                         up_offset_int <= peak_signed - $signed({1'b0, up_coarse_start});
+                        up_peak_power <= search_peak_power;
                         state <= STATE_WAIT_UP_FRAC;
                     end
                 end
@@ -427,21 +449,44 @@ module lora_joint_chirp_grid_controller #(
 
                 STATE_WAIT_DOWN: begin
                     if (search_failed) begin
-                        fine_skip <= FINE_GUARD_U64[31:0];
-                        fine_resync_valid <= 1'b1;
-                        down_search_abort_error <= 1'b1;
-                        busy <= 1'b0;
-                        state <= STATE_IDLE;
+                        if (retry_down_epoch) begin
+                            up_coarse_start <= up_coarse_start + SYMBOL_SAMPLES_U64;
+                            down_coarse_start <= down_coarse_start + SYMBOL_SAMPLES_U64;
+                            epoch_retried <= 1'b1;
+                            state <= STATE_WAIT_DOWN_DATA;
+                        end else begin
+                            fine_skip <= FINE_GUARD_U64[31:0];
+                            fine_resync_valid <= 1'b1;
+                            down_search_abort_error <= 1'b1;
+                            busy <= 1'b0;
+                            state <= STATE_IDLE;
+                        end
                     end else if (search_triplet_valid) begin
                         down_offset_int <= peak_signed - down_coarse_signed;
+                        down_peak_power <= search_peak_power;
                         state <= STATE_WAIT_DOWN_FRAC;
                     end
                 end
 
                 STATE_WAIT_DOWN_FRAC: begin
                     if (search_offset_valid) begin
-                        down_offset_frac_q12 <= search_offset_q12;
-                        state <= STATE_SUM;
+                        if (retry_down_epoch && down_epoch_weak) begin
+                            up_coarse_start <= up_coarse_start + SYMBOL_SAMPLES_U64;
+                            down_coarse_start <= down_coarse_start + SYMBOL_SAMPLES_U64;
+                            epoch_retried <= 1'b1;
+                            state <= STATE_WAIT_DOWN_DATA;
+                        end else if (epoch_retry_allowed && down_epoch_weak) begin
+                            // Neither epoch has a credible SFD. Return the
+                            // guard without issuing a precise timestamp.
+                            fine_skip <= FINE_GUARD_U64[31:0];
+                            fine_resync_valid <= 1'b1;
+                            down_search_abort_error <= 1'b1;
+                            busy <= 1'b0;
+                            state <= STATE_IDLE;
+                        end else begin
+                            down_offset_frac_q12 <= search_offset_q12;
+                            state <= STATE_SUM;
+                        end
                     end
                 end
 
