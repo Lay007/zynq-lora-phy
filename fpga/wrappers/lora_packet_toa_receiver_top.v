@@ -21,13 +21,17 @@
 `endif
 
 module lora_packet_toa_receiver_top #(
+    parameter integer SPREADING_FACTOR = 7,
+    parameter integer SAMPLES_PER_CHIP = 8,
     parameter integer AUTO_GRID_RESYNC = 1,
     parameter integer HISTORY_DEPTH = 65536,
-    parameter integer REF_SAMPLES = 1024,
+    parameter integer REF_SAMPLES = (1 << SPREADING_FACTOR) * SAMPLES_PER_CHIP,
     parameter integer SEARCH_RADIUS = 16,
     parameter integer GRID_FINE_GUARD_SAMPLES = 16,
     parameter integer MATCH_ACC_WIDTH = 48,
-    parameter integer MATCH_POWER_SHIFT = 30,
+    // Keep long-chirp correlation powers inside the 32-bit interpolator range.
+    parameter integer MATCH_POWER_SHIFT = 30 + ((SPREADING_FACTOR > 10) ?
+                                             2*(SPREADING_FACTOR-10) : 0),
     parameter integer MATCH_REQUEST_ON_RESPONSE = 0,
     parameter integer JOINT_PREFETCH_UP = 0,
     parameter integer MATCH_COARSE_STRIDE = 1,
@@ -190,8 +194,8 @@ module lora_packet_toa_receiver_top #(
     generate
         if (AUTO_GRID_RESYNC != 0) begin : g_grid_resync
             lora_symbol_grid_resync #(
-                .SPREADING_FACTOR(7),
-                .SAMPLES_PER_CHIP(8),
+                .SPREADING_FACTOR(SPREADING_FACTOR),
+                .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP),
                 .FINE_GUARD_SAMPLES(GRID_FINE_GUARD_SAMPLES)
             ) u_grid_resync (
                 .clk(clk),
@@ -219,6 +223,8 @@ module lora_packet_toa_receiver_top #(
     assign packet_straddle_detected = detector_straddle;
 
     lora_fft_detector_timestamp_path #(
+        .SPREADING_FACTOR(SPREADING_FACTOR),
+        .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP),
         .QUALIFY_PREAMBLE_TIMESTAMP(JOINT_PREFETCH_UP)
     ) u_fft_detector_timestamp (
         .clk(clk),
@@ -363,7 +369,11 @@ module lora_packet_toa_receiver_top #(
             held_packet_early_sync <= packet_early_sync_detected;
         end
     end
-    wire raw_search_failure = toa_underflow_error || raw_search_restart_error ||
+    // The generated log-domain interpolator rejects any zero magnitude and
+    // emits no offsetValid. Retire that search rather than wait indefinitely.
+    wire invalid_interpolation_triplet = raw_peak_triplet_valid &&
+        ((magnitude_before == 0) || (magnitude_peak == 0) || (magnitude_after == 0));
+    wire raw_search_failure = invalid_interpolation_triplet || toa_underflow_error || raw_search_restart_error ||
         toa_mac_window_mismatch_error || toa_mac_read_miss_error ||
         toa_mac_response_mismatch_error || toa_mac_restart_error ||
         raw_peak_boundary_error || toa_peak_restart_error;
@@ -371,7 +381,7 @@ module lora_packet_toa_receiver_top #(
     generate
         if (AUTO_GRID_RESYNC != 0) begin : g_joint_grid_timing
             lora_joint_chirp_grid_controller #(
-                .SAMPLES_PER_CHIP(8),
+                .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP),
                 .SYMBOL_SAMPLES(REF_SAMPLES),
                 .SEARCH_RADIUS(SEARCH_RADIUS),
                 .PREFETCH_UP(JOINT_PREFETCH_UP),

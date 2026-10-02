@@ -3,6 +3,8 @@
 `timescale 1ns/1ps
 
 module tb_lora_cfo_derotator;
+    parameter integer SF = 7;
+    parameter integer SPC = 8;
     localparam real PI = 3.14159265358979323846;
     localparam integer ITER = 16;
     localparam integer LAT = ITER + 3;
@@ -20,7 +22,8 @@ module tb_lora_cfo_derotator;
     wire out_valid, out_rv, out_sr, rotating;
     wire [31:0] out_rs;
 
-    lora_cfo_derotator #(.ITERATIONS(ITER)) dut (
+    lora_cfo_derotator #(.ITERATIONS(ITER), .SPREADING_FACTOR(SF),
+        .SAMPLES_PER_CHIP(SPC)) dut (
         .clk(clk), .resetn(resetn),
         .in_re(in_re), .in_im(in_im), .in_valid(in_valid),
         .in_resync_valid(in_rv), .in_resync_skip(in_rs), .in_stream_reset(in_sr),
@@ -108,7 +111,9 @@ module tb_lora_cfo_derotator;
             t_in = t_in + 1;
             @(negedge clk);
             load = 0;
-            m_on = 1; m_acc = 0; m_inc = c <<< 7;
+            m_on = 1; m_acc = 0;
+            // Independent physical conversion: displacement/(N*L^2) turns.
+            m_inc = ($signed(c) * 64'sd1048576) / ((1 << SF)*SPC*SPC);
             exp_valid[t_in] = 0; exp_rv[t_in] = 0; exp_rs[t_in] = in_rs; exp_exact[t_in] = 1;
             exp_re[t_in] = in_re; exp_im[t_in] = in_im;
             t_in = t_in + 1;

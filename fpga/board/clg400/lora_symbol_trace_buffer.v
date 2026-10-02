@@ -20,6 +20,9 @@ module lora_symbol_trace_buffer #(
     input  wire                    sample_clk,
     input  wire                    sample_resetn,
     input  wire                    stream_reset,
+    // Zero retains the historical 128-entry contract. A nonzero limit is
+    // latched at detection; later software page/index writes cannot change it.
+    input  wire [7:0]              capture_limit,
     input  wire                    packet_detected,
     input  wire [15:0]             preamble_bin,
     input  wire [31:0]             symbol_index,
@@ -47,6 +50,7 @@ module lora_symbol_trace_buffer #(
     reg [127:0] trace_memory [0:TRACE_DEPTH-1];
     reg [TRACE_ADDR_WIDTH-1:0] write_index_sample;
     reg [7:0] captured_count_sample;
+    reg [7:0] capture_limit_sample;
     reg capture_active_sample;
     reg capture_complete_sample;
     reg [15:0] preamble_bin_sample;
@@ -56,6 +60,7 @@ module lora_symbol_trace_buffer #(
         if (!sample_resetn) begin
             write_index_sample       <= {TRACE_ADDR_WIDTH{1'b0}};
             captured_count_sample    <= 8'd0;
+            capture_limit_sample     <= TRACE_DEPTH_U8;
             capture_active_sample    <= 1'b0;
             capture_complete_sample  <= 1'b0;
             preamble_bin_sample      <= 16'd0;
@@ -63,6 +68,7 @@ module lora_symbol_trace_buffer #(
         end else if (stream_reset) begin
             write_index_sample       <= {TRACE_ADDR_WIDTH{1'b0}};
             captured_count_sample    <= 8'd0;
+            capture_limit_sample     <= TRACE_DEPTH_U8;
             capture_active_sample    <= 1'b0;
             capture_complete_sample  <= 1'b0;
             preamble_bin_sample      <= 16'd0;
@@ -70,6 +76,8 @@ module lora_symbol_trace_buffer #(
             if (packet_detected && !capture_active_sample &&
                 !capture_complete_sample) begin
                 capture_active_sample <= 1'b1;
+                capture_limit_sample <= (capture_limit == 0 || capture_limit > TRACE_DEPTH_U8)
+                    ? TRACE_DEPTH_U8 : capture_limit;
                 preamble_bin_sample   <= preamble_bin;
             end
 
@@ -85,7 +93,7 @@ module lora_symbol_trace_buffer #(
                 };
                 captured_count_sample <= captured_count_sample + 8'd1;
 
-                if (captured_count_sample == TRACE_DEPTH_U8 - 8'd1) begin
+                if (captured_count_sample == capture_limit_sample - 8'd1) begin
                     capture_active_sample   <= 1'b0;
                     capture_complete_sample <= 1'b1;
                     capture_sequence_sample <= capture_sequence_sample + 32'd1;

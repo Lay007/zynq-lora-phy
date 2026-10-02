@@ -547,6 +547,18 @@ module tb_lora_clg400_gpreg_bridge;
         end
         $display("PASS decision history ring: writes, freeze, indexed read, drop count, release");
 
+        gp_ctrl = 32'h80f8_1211; // history address shares the limit bits
+        repeat (8) @(posedge sample_clk);
+        expect32({24'd0, dut.u_symbol_trace.capture_limit}, 32'd0,
+                 "legacy history address leaves capture limit at default");
+        gp_ctrl = 32'h0018_1241; // bit 6 + three pairs = six entries
+        repeat (8) @(posedge sample_clk);
+        expect32({24'd0, dut.u_symbol_trace.capture_limit}, 32'd6,
+                 "capture limit requires explicit bit 6");
+        gp_ctrl = 32'h0000_1221;
+        repeat (5) @(posedge ctrl_clk);
+        expect32(gp_status, 32'h5742_0708, "read-only receiver build SF7 L8");
+
         $display("PASS tb_lora_clg400_gpreg_bridge");
         $finish;
     end

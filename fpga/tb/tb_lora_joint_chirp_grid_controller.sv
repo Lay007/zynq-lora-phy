@@ -424,6 +424,53 @@ module tb_lora_joint_chirp_grid_controller;
         return_peak(64'd210240, 16'sd2048);
         expect_result(32'sd1, 32'd17);
 
+        // Missing fractional response must retire this packet and restore the
+        // withheld guard. A subsequent valid packet must work without reset.
+        pulse_packet(64'd220000, 16'd0);
+        wait_search(1'b0, 64'd220000);
+        search_busy <= 1'b0;
+        search_peak_sample_count <= 64'd220000;
+        search_triplet_valid <= 1'b1;
+        @(negedge clk);
+        search_triplet_valid <= 1'b0;
+        while (!fine_resync_valid) @(negedge clk);
+        if (busy || !up_search_abort_error || precise_correction_applied ||
+            timing_valid || fine_skip != GUARD) begin
+            errors = errors + 1;
+            $display("FAIL missing up fraction did not retire safely");
+        end
+        @(negedge clk);
+        pulse_packet(64'd240000, 16'd0);
+        wait_search(1'b0, 64'd240000);
+        return_peak(64'd240000);
+        wait_search(1'b1, 64'd250240);
+        return_peak(64'd250240);
+        expect_result(32'sd0, GUARD);
+
+        pulse_packet(64'd260000, 16'd0);
+        wait_search(1'b0, 64'd260000);
+        return_peak(64'd260000);
+        wait_search(1'b1, 64'd270240);
+        search_busy <= 1'b0;
+        search_peak_sample_count <= 64'd270240;
+        search_triplet_valid <= 1'b1;
+        @(negedge clk);
+        search_triplet_valid <= 1'b0;
+        while (!fine_resync_valid) @(negedge clk);
+        if (busy || !down_search_abort_error || precise_correction_applied ||
+            timing_valid || fine_skip != GUARD) begin
+            errors = errors + 1;
+            $display("FAIL missing down fraction did not retire safely");
+        end
+        @(negedge clk);
+        pulse_packet(64'd280000, 16'd0);
+        wait_search(1'b0, 64'd280000);
+        return_peak(64'd280000);
+        wait_search(1'b1, 64'd290240);
+        return_peak(64'd290240);
+        expect_result(32'sd0, GUARD);
+        $display("PASS missing up/down fraction recovery, following packet without reset");
+
         if (errors) begin
             $display("FAIL tb_lora_joint_chirp_grid_controller (%0d errors)", errors);
             $fatal(1);

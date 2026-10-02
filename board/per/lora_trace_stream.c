@@ -19,12 +19,14 @@
  *
  *   PKT <t_ms> cap=<capture_sequence> pbin=<preamble_bin> realigned=<0|1>
  *       n=<captured_count> p0seq=<page0 sequence> p0coarse=<hex64>
- *       p0frac=<q12> joint=<hex> sym=<hex byte per symbol, 128 x 2 chars>
+ *       p0frac=<q12> joint=<hex> sf=<5..12> sym_bits=<8|16>
+ *       sym=<128 slots of 2 hex chars for SF<=8, otherwise 4; unused slots zero>
  *   TIMEOUT <t_ms> status=<hex>       (no complete trace within --timeout-ms)
  *
  * Register map and page selection as tools/read_clg400_symbol_trace.py.
  *
- *   lora_trace_stream [count] [timeout_ms] [duration_ms] (count/duration 0 = unlimited)
+ *   lora_trace_stream [count] [timeout_ms] [duration_ms] [SF] [L] [entries]
+ *   count/duration 0 = unlimited; defaults SF7, L8, 128 entries.
  */
 
 #include <fcntl.h>
@@ -49,11 +51,14 @@
 #define DEBUG 0x588
 #define SIGNATURE 0x5c8
 
-#define PAGE_MASK 0x80f8ffffu /* keeps everything but the page/index bits */
+#define PAGE_MASK 0x80f8ffcfu /* keeps capture limit; clears history/profile/page/index bits */
 #define SYMBOL_PAGE 0x00010000u
 #define JOINT_PAGE 0x00040000u
 #define CLOCK_PAGE 0x00020000u
 #define TRACE_DEPTH 128
+#define PROFILE_PAGE 0x20u
+#define TRACE_LIMIT_MASK 0x80f80000u
+#define TRACE_LIMIT_ENABLE 0x40u
 
 static volatile uint32_t *regs;
 static volatile sig_atomic_t stop;
@@ -92,7 +97,11 @@ int main(int argc, char **argv) {
   long count = argc > 1 ? atol(argv[1]) : 0;
   long timeout_ms = argc > 2 ? atol(argv[2]) : 5000;
   long duration_ms = argc > 3 ? atol(argv[3]) : 0;
-  if (count < 0 || timeout_ms <= 0 || duration_ms < 0) return 2;
+  unsigned sf = argc > 4 ? (unsigned)atoi(argv[4]) : 7u;
+  unsigned spc = argc > 5 ? (unsigned)atoi(argv[5]) : 8u;
+  unsigned entries = argc > 6 ? (unsigned)atoi(argv[6]) : TRACE_DEPTH;
+  if (count < 0 || timeout_ms <= 0 || duration_ms < 0 || sf < 5 || sf > 12 ||
+      (spc != 2 && spc != 4 && spc != 8) || entries < 2 || entries > 128 || (entries & 1u)) return 2;
   int fd = open("/dev/mem", O_RDWR | O_SYNC);
   if (fd < 0) { perror("/dev/mem"); return 1; }
   regs = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, BRIDGE_BASE);
@@ -106,6 +115,20 @@ int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   control_base = REG(CONTROL);
   uint32_t original = control_base;
+  select_page(PROFILE_PAGE);
+  uint32_t profile = REG(STATUS);
+  int wideband_abi = (profile >> 16) == 0x5742u;
+  if ((wideband_abi && ((profile >> 8 & 0xffu) != sf || (profile & 0xffu) != spc)) ||
+      (!wideband_abi && (sf != 7 || spc != 8 || entries != TRACE_DEPTH))) {
+    REG(CONTROL) = original;
+    fprintf(stderr, "receiver build profile mismatch: profile=0x%08x requested SF%u L%u n=%u\n", profile, sf, spc, entries);
+    return 1;
+  }
+  if (wideband_abi) {
+    unsigned pairs = entries == TRACE_DEPTH ? 0u : entries / 2u;
+    control_base = (control_base & ~TRACE_LIMIT_MASK) | TRACE_LIMIT_ENABLE |
+                   ((pairs & 31u) << 19) | ((pairs >> 5) << 31);
+  }
   uint64_t t0 = now_ms();
   printf("START bridge=LORA control=0x%08x count=%ld timeout_ms=%ld\n", original, count, timeout_ms);
   select_page(0);
@@ -143,16 +166,27 @@ int main(int argc, char **argv) {
       continue;
     }
     unsigned captured = status & 0xffu;
+    if (captured != entries) {
+      REG(CONTROL) = original;
+      fprintf(stderr, "unexpected trace length: %u, requested %u\n", captured, entries);
+      return 1;
+    }
     uint32_t sequence = REG(SEQUENCE);
     uint32_t debug = REG(DEBUG);
-    char sym[2 * TRACE_DEPTH + 1];
+    unsigned digits = sf > 8 ? 4u : 2u;
+    char sym[4 * TRACE_DEPTH + 1];
+    /* Fixed host framing: unused tail entries are zero, not stale RAM. */
+    for (unsigned i = 0; i < digits * TRACE_DEPTH; ++i) sym[i] = '0';
+    sym[digits * TRACE_DEPTH] = '\0';
     int changed = 0;
-    for (unsigned i = 0; i < TRACE_DEPTH; ++i) {
+    for (unsigned i = 0; i < captured; ++i) {
       select_page(SYMBOL_PAGE | (i << 24));
       uint32_t s = REG(SYMBOL);
       if (REG(STATUS) != status || REG(SEQUENCE) != sequence) changed = 1;
-      snprintf(&sym[2 * i], 3, "%02x", s & 0xffu);
+      if (sf > 8) snprintf(&sym[digits*i], 5, "%04x", s & 0xffffu);
+      else snprintf(&sym[digits*i], 3, "%02x", s & 0xffu);
     }
+    if (captured < TRACE_DEPTH) sym[digits*captured] = '0';
     select_page(0); /* page 0: the published timestamp */
     uint32_t p0seq = REG(SEQUENCE);
     uint32_t p0status = REG(STATUS);
@@ -171,15 +205,20 @@ int main(int argc, char **argv) {
     uint32_t joint_phase_bin = REG(METRICS);
     select_page(CLOCK_PAGE);
     uint32_t clock_status = REG(STATUS);
+    uint32_t sample_interval_clocks = REG(SEQUENCE);
+    uint32_t mac_search_clocks = REG(SYMBOL);
+    uint32_t sample_interval_min_clocks = REG(SAMPLE_LO);
+    uint32_t mac_search_completed = REG(SAMPLE_HI);
     uint32_t drop_after = REG(METRICS) & 0xffffu;
     select_page(0);
     if (p0seq != REG(SEQUENCE)) changed = 1;
     printf("PKT %" PRIu64 " cap=%u pbin=%u realigned=%u n=%u p0seq=%u p0coarse=0x%08x%08x "
-           "p0frac=%d p0status=0x%08x p0log=%d p0debug=0x%08x joint=0x%08x joint_correction=%d joint_up_offset=%d joint_up_coarse=%u joint_packet_start=%u joint_phase_bin=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u p0fresh=%d changed=%d sym=%s\n",
+           "p0frac=%d p0status=0x%08x p0log=%d p0debug=0x%08x joint=0x%08x joint_correction=%d joint_up_offset=%d joint_up_coarse=%u joint_packet_start=%u joint_phase_bin=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u p0fresh=%d changed=%d sf=%u sym_bits=%u sample_interval_clocks=%u sample_interval_min_clocks=%u mac_search_clocks=%u mac_search_completed=%u sym=%s\n",
            now_ms() - t0, sequence, debug >> 16, (debug >> 8) & 1u, captured, p0seq,
            p0hi, p0lo, p0frac, p0status, (int32_t)p0log, p0debug, joint,
            joint_correction, joint_up_offset, joint_up_coarse, joint_packet_start, joint_phase_bin, clock_status,
-           drop_before, drop_after, p0seq != last_p0seq, changed, sym);
+           drop_before, drop_after, p0seq != last_p0seq, changed, sf, digits*4u,
+           sample_interval_clocks, sample_interval_min_clocks, mac_search_clocks, mac_search_completed, sym);
     last_p0seq = p0seq;
     ++got;
   }

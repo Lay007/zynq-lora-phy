@@ -25,6 +25,7 @@ start sample.
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 import json
 import sys
 from pathlib import Path
@@ -36,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lora_per_ideal import ldro_required, test_payload  # noqa: E402
 from zynq_lora_phy import encode_lora_packet  # noqa: E402
-from zynq_lora_phy.css import CssConfig, modulate_symbol, reference_chirp  # noqa: E402
+from zynq_lora_phy.css import CssConfig, reference_chirp  # noqa: E402
 
 SAMPLE_RATE = 1_000_000
 NOISE_EDGE_HZ = 150_000
@@ -44,13 +45,26 @@ PREAMBLE = 12
 SYNC_WORD = 0x12
 
 
+@lru_cache(maxsize=16)
+def _reference(config: CssConfig) -> np.ndarray:
+    samples = reference_chirp(config)
+    samples.flags.writeable = False
+    return samples
+
+
 def chirp(n_chips: int, spc: int, symbol: int = 0, up: bool = True) -> np.ndarray:
     """One CSS symbol from the project's modulator (validated on SX1262 packets)."""
 
     config = CssConfig(spreading_factor=n_chips.bit_length() - 1, samples_per_chip=spc)
     if up:
-        return modulate_symbol(symbol, config)
-    return reference_chirp(config, up=False)
+        if not 0 <= symbol < n_chips:
+            raise ValueError('symbol must be in the spreading-factor range')
+        samples = np.roll(_reference(config), -symbol*spc)
+        # A cyclic shift also rotates the initial phase. Remove that constant
+        # so consecutive RF symbols meet at phase zero, as a continuous-phase
+        # LoRa modulator does. Correlator powers are invariant to this rotation.
+        return samples * np.conjugate(samples[0])
+    return np.conjugate(_reference(config))
 
 
 def packet_waveform(payload: bytes, sf: int, bw_hz: float, cr: int, fs: float = SAMPLE_RATE) -> np.ndarray:
@@ -65,6 +79,11 @@ def packet_waveform(payload: bytes, sf: int, bw_hz: float, cr: int, fs: float = 
     parts += [chirp(n, spc, (SYNC_WORD >> 4) * 8), chirp(n, spc, (SYNC_WORD & 0xF) * 8)]
     down = chirp(n, spc, up=False)
     parts += [down, down, down[: n * spc // 4]]
+    # Native SX126x SF5/6 framing has two additional CSS-bin-1 upchirps.
+    # Compatibility is qualified with hardware, separately from encoder
+    # round trips. These chirps do not belong to the explicit header.
+    if sf < 7:
+        parts += [chirp(n, spc, 1), chirp(n, spc, 1)]
     parts += [chirp(n, spc, int(s)) for s in symbols]
     return np.concatenate(parts)
 
@@ -134,16 +153,24 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.templates:
-        waves = [packet_waveform(test_payload(args.first_sequence + k), args.sf, args.bw * 1e3, args.cr, args.fs)
-                 for k in range(args.packets)]
-        if len({w.size for w in waves}) != 1:
-            raise ValueError("templates differ in length")
-        np.concatenate(waves).astype(np.complex64).tofile(args.out)
+        if args.packets < 1:
+            raise ValueError('at least one template is required')
+        size = None
+        # SF12 batches can exceed 100 MB. Write each packet once instead of
+        # holding the list, concatenated complex128 and complex64 copies.
+        with args.out.open('wb') as destination:
+            for k in range(args.packets):
+                wave = packet_waveform(test_payload(args.first_sequence+k), args.sf,
+                                       args.bw*1e3, args.cr, args.fs)
+                if size is not None and wave.size != size:
+                    raise ValueError('templates differ in length')
+                size = wave.size
+                wave.astype(np.complex64).tofile(destination)
         side = {"sf": args.sf, "bw_khz": args.bw, "cr": args.cr, "packets": args.packets,
-                "samples_per_packet": int(waves[0].size), "first_sequence": args.first_sequence, "sample_rate": args.fs,
+                "samples_per_packet": int(size), "first_sequence": args.first_sequence, "sample_rate": args.fs,
                 "format": "complex64, unit amplitude, packets back to back"}
         args.out.with_suffix(args.out.suffix + ".json").write_text(json.dumps(side, indent=1) + "\n")
-        print(f"{args.out}: {args.packets} templates x {waves[0].size} samples")
+        print(f"{args.out}: {args.packets} templates x {size} samples")
         return 0
 
     x, meta = build(args.sf, args.bw, args.cr, args.snr, args.packets, args.gap,

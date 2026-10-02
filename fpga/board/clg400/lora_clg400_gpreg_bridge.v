@@ -18,6 +18,8 @@
 // acknowledgement; only the toggles pass through ordinary two-flop
 // synchronizers.
 module lora_clg400_gpreg_bridge #(
+    parameter integer SPREADING_FACTOR = 7,
+    parameter integer SAMPLES_PER_CHIP = 8,
     parameter REFERENCE_FILE = "fpga/rom/lora_sf7_l8_reference_q10.mem"
 ) (
     input  wire                    ctrl_clk,
@@ -156,6 +158,8 @@ module lora_clg400_gpreg_bridge #(
     wire unused_rvalid;
 
     lora_packet_toa_receiver_top #(
+        .SPREADING_FACTOR(SPREADING_FACTOR),
+        .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP),
         .DEFAULT_RECEIVER_ENABLE(1'b1),
         .REFERENCE_FILE(REFERENCE_FILE)
     ) u_receiver (
@@ -287,6 +291,8 @@ module lora_clg400_gpreg_bridge #(
         .sample_clk(sample_clk),
         .sample_resetn(sample_resetn),
         .stream_reset(stream_reset || trace_rearm),
+        .capture_limit(ctrl_sample_sync[6] ?
+            {1'b0, ctrl_sample_sync[31], ctrl_sample_sync[23:19], 1'b0} : 8'd0),
         .packet_detected(packet_detected),
         .preamble_bin(preamble_bin),
         .symbol_index(symbol_index),
@@ -778,6 +784,12 @@ module lora_clg400_gpreg_bridge #(
     // The decision-history page wins over every other page; software that
     // never sets bit 4 sees the existing ABI unchanged.
     wire history_page_selected = gp_ctrl[4];
+    // Bit 5 is the read-only build profile page. Bit 6 enables the symbol limit
+    // in bit 31 and 23:19 (pairs, zero means 128). Without bit 6, history
+    // addresses in these shared bits cannot change the legacy capture length.
+    wire profile_page_selected = gp_ctrl[5];
+    localparam [7:0] PROFILE_SF = SPREADING_FACTOR;
+    localparam [7:0] PROFILE_L = SAMPLES_PER_CHIP;
     wire joint_page_selected = gp_ctrl[18];
     wire symbol_page_selected =
         gp_ctrl[16] && !gp_ctrl[17] && !joint_page_selected;
@@ -836,7 +848,8 @@ module lora_clg400_gpreg_bridge #(
         history_newest_ctrl
     };
 
-    assign gp_status = history_page_selected ? history_status :
+    assign gp_status = profile_page_selected ? {16'h5742, PROFILE_SF, PROFILE_L} :
+        history_page_selected ? history_status :
         joint_page_selected ? joint_status :
         clock_page_selected ? clock_status :
         symbol_page_selected ? trace_status : timestamp_status;

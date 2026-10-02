@@ -85,7 +85,7 @@ def start_tx(c, args, prefix, spp, snr, seed, padded, max_seconds):
     gap, lead, tail = int(args.gap*args.tx_rate), int(args.tx_rate), int(2*args.tx_rate)
     fifo = prefix + '.fifo'
     gen = (f'{prefix}.noise {prefix}.c64 {args.packets} {spp} {gap} '
-           f'{snr} {args.bw*1000} -14 {seed} {args.tx_rate} {args.packets} {lead} {tail}')
+           f'{snr} {args.bw*1000} {args.rms_dbfs} {seed} {args.tx_rate} {args.packets} {lead} {tail}')
     command = (f'mkfifo {fifo} || exit 1; {gen} > {fifo} 2>{prefix}.noise.err & producer=$!; '
                f'echo "$producer" > {prefix}.producer.pid; '
                f'iio_writedev -b 262144 -s {padded} cf-ad9361-dds-core-lpc '
@@ -109,8 +109,16 @@ def measure(c, args, prefix: str, spp: int, snr: float, seed: int, checkpoint) -
              'started_utc': datetime.now(timezone.utc).isoformat()}
     checkpoint(point)
     raw = args.out.with_name(args.out.stem + f'.snr-{snr:g}.trace.txt')
+    trace_arguments = ''
+    if args.pl_wideband:
+        from zynq_lora_phy import encode_lora_packet
+        from lora_per_ideal import test_payload
+        symbols = len(encode_lora_packet(test_payload(args.first_sequence),
+                    spreading_factor=args.sf, coding_rate=args.cr).symbols)
+        entries = min(128, 2*math.ceil((symbols+6+(2 if args.sf < 7 else 0))/2))
+        trace_arguments = f' {args.sf} 2 {entries}'
     capture_command = (f'echo $$ > {prefix}.capture.pid; exec {prefix}.trace 0 1000 '
-                       f'{math.ceil(max_seconds * 1000)}')
+                       f'{math.ceil(max_seconds * 1000)}{trace_arguments}')
     _, capture_out, capture_err = c.exec_command('sh -c ' + shlex.quote(capture_command), timeout=max_seconds+15)
     capture = capture_out.channel
     tx = None
@@ -203,8 +211,12 @@ def main() -> int:
     parser.add_argument('--tx-rate', type=float, default=1e6)
     parser.add_argument('--rx-gain', type=float, default=37)
     parser.add_argument('--tx-atten', type=float, default=10)
+    parser.add_argument('--rms-dbfs', type=float, default=-14,
+                        help='RMS of the complete signal+noise stream; reduce for short high-SNR packets')
     parser.add_argument('--seed', type=int, default=1000)
     parser.add_argument('--restore-profile', action='store_true')
+    parser.add_argument('--pl-wideband', action='store_true',
+                        help='experimental SF5..12/BW500/L2 image; hardware profile must match')
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--templates', type=Path, help='prebuilt uniquely numbered complex64 templates and .json sidecar')
     parser.add_argument('--allow-unrecognized-rx', action='store_true',
@@ -213,15 +225,17 @@ def main() -> int:
     args = parser.parse_args()
     if args.template_cache_dir and not re.fullmatch(r'/tmp/lora-finite-cache-[0-9a-f]{32}', args.template_cache_dir):
         parser.error('template cache must be /tmp/lora-finite-cache-<32 hex digits>')
-    if ((args.receiver == 'pl' and (args.sf != 7 or args.bw != 125))
-            or not 7 <= args.sf <= 12 or args.bw not in (125,250,500)
+    if ((args.receiver == 'pl' and not args.pl_wideband and (args.sf != 7 or args.bw != 125))
+            or (args.pl_wideband and (args.receiver != 'pl' or args.bw != 500))
+            or not 5 <= args.sf <= 12 or args.bw not in (125,250,500)
             or not 1 <= args.cr <= 4 or args.tx_rate != 1e6
             or not 1 <= args.packets <= 500 or args.first_sequence < 0
             or args.first_sequence + args.packets > 2**32 or args.gap < 0.15
             or not 0 <= args.rx_gain <= 73 or not 0 <= args.tx_atten <= 89.75
-            or not all(math.isfinite(x) for x in [*args.snr, args.gap, args.rx_gain, args.tx_atten])
+            or not -60 <= args.rms_dbfs <= -6
+            or not all(math.isfinite(x) for x in [*args.snr, args.gap, args.rx_gain, args.tx_atten, args.rms_dbfs])
             or len(set(args.snr)) != len(args.snr)):
-        parser.error('PL requires SF7/BW125; serial supports SF7..12/BW125/250/500; use 1MS/s, CR1..4, valid RF values, 1..500 distinct packets and gap >=0.15s')
+        parser.error('PL requires SF7/BW125 or --pl-wideband with a matching SF5..12/BW500 image; serial supports SF5..12/BW125/250/500; use 1MS/s, CR1..4, valid RF values, 1..500 distinct packets and gap >=0.15s')
     if args.out.exists(): parser.error('output exists; select a new series path')
     build_info = json.loads((args.bin_dir / 'per-tools-manifest.json').read_text(encoding='utf-8'))
     if not build_info['target'].startswith('arm'): parser.error('board binaries require an ARM compiler')
@@ -283,11 +297,21 @@ def main() -> int:
         if args.receiver == 'pl':
             signature = bench.run(c, 'devmem 0x790405c8 32').strip().lower()
             if signature != '0x4c4f5241': raise RuntimeError('unexpected PL signature: ' + signature)
+            if args.pl_wideband:
+                # Page 5 returns compile-time SF and L; a legacy image cannot
+                # silently become a wideband measurement by changing CLI flags.
+                profile_reply = bench.run(c, 'devmem 0x79040404 32 0x1221; sleep 0.02; '
+                                           'devmem 0x79040408 32; devmem 0x79040404 32 0x1201').splitlines()
+                report['pl_build_profile'] = profile_reply[0].strip()
+                expected_profile = 0x57420000 | (args.sf << 8) | 2
+                if int(report['pl_build_profile'], 16) != expected_profile:
+                    raise RuntimeError('PL build profile differs from requested SF/BW500/L2')
         if args.restore_profile:
             profile = args.out.with_suffix('.restore.sh')
             profile.write_bytes((ROOT / 'fpga/board/clg400/restore_rx_profile.sh').read_bytes().replace(b'\r\n', b'\n'))
             bench.put(c, profile, prefix + '.restore.sh')
-            report['restore_log'] = bench.run(c, f'GAIN={args.rx_gain} LO=868100000 RATE=1000000 RX_FIR=generic sh {prefix}.restore.sh')
+            rx_bandwidth = 1000000 if args.bw == 500 else 200000
+            report['restore_log'] = bench.run(c, f'GAIN={args.rx_gain} LO=868100000 RATE=1000000 BANDWIDTH={rx_bandwidth} RX_FIR=generic sh {prefix}.restore.sh')
         report['rx_profile'] = bench.run(c, f'cat {bench.PHY}/in_voltage_sampling_frequency '
                                         f'{bench.PHY}/in_voltage0_gain_control_mode {bench.PHY}/in_voltage_filter_fir_en')
         if report['rx_profile'].split() != ['1000000', 'manual', '1']:
