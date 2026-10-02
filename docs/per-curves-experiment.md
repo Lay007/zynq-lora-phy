@@ -49,11 +49,16 @@ missing fractional response to 64 clocks. It returns the withheld symbol-grid
 guard and declines the precise timestamp for that packet; later packets remain
 processable. A valid generated interpolation completes within 38 clocks.
 
-Trace records also expose the hardware clock-page counters: sample interval,
-minimum sample interval, last MAC busy duration, and completed MAC searches.
-`mac_search_clocks / 62.5` is microseconds for the fixed 62.5 MHz board clock.
-It measures the last MAC search, not the complete detection-to-ToA latency;
-do not equate it with a host collection timestamp or a ranging delay.
+Trace records expose sample intervals and the last completed `toa_search_busy`
+interval. The historical field names `mac_search_clocks` and
+`mac_search_completed` are retained for file compatibility: with joint search
+enabled the signal is `joint_grid_busy`, not the inner MAC's busy signal.
+The span includes both search legs, interpolation, waiting for SFD samples,
+and speculative prefetch waiting for packet confirmation. Divide the clock
+count by 62.5 for microseconds at the fixed 62.5 MHz receiver clock.
+These live diagnostic counters are read after capture, not latched with the
+packet's ToA; speculative work can change them. They do not establish a
+packet-attributed detection-to-ToA latency, MAC compute time or ranging delay.
 
 `--preserve-pl-state` skips the batch's full PL stream reset for explicit
 continuity experiments. Configure RF and reset PL in the first batch, then

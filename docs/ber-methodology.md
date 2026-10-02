@@ -133,9 +133,12 @@ payload mismatch. No failed packet disappears from a denominator.
 
 CSV rates remain exact observed ratios. Each uncoded BER/SER and primary coded
 BER/PER metric includes a two-sided 95% Wilson interval. A zero-error run does
-not prove a zero underlying rate: plots place it at `0.5/N` only to keep the
-marker visible on a logarithmic axis. For example, zero packet errors in 200
-trials still has a 95% Wilson upper bound of about 1.88%.
+not prove a zero underlying rate. The logarithmic curve breaks at that
+observation; an unconnected downward triangle marks the two-sided 95% Wilson
+upper bound. This is a statistical bound, not an observed BER/PER. The old
+`0.5/N` substitution and connected artificial tails are no longer used.
+For example, zero packet errors in 200 trials still has a 95% Wilson upper
+bound of about 1.88%.
 
 ## Reproduce
 
@@ -145,7 +148,14 @@ addpath examples
 campaign = plot_ber_campaign;
 ```
 
-The command regenerates three PNGs, three CSVs, and
+To redraw the figures from saved counts without rerunning Monte Carlo or
+changing the CSV/MAT evidence:
+
+```matlab
+figures = redraw_ber_campaign;
+```
+
+`plot_ber_campaign` regenerates three PNGs, three CSVs, and
 [`ber-demodulator-campaign.mat`](data/ber-demodulator-campaign.mat). Historical
 results remain available through Git history. The current MAT schema is
 `zynq-lora-ber-campaign-v3` and includes `idealGap` with both legacy and current
