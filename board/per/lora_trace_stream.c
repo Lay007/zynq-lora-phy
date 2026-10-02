@@ -21,7 +21,7 @@
  *       n=<captured_count> p0seq=<page0 sequence> p0coarse=<hex64>
  *       p0frac=<q12> joint=<hex> sf=<5..12> sym_bits=<8|16>
  *       sym=<128 slots of 2 hex chars for SF<=8, otherwise 4; unused slots zero>
- *   TIMEOUT <t_ms> status=<hex>       (no complete trace within --timeout-ms)
+ *   TIMEOUT <t_ms> status=<hex>       (no capture progress within timeout_ms)
  *
  * Register map and page selection as tools/read_clg400_symbol_trace.py.
  *
@@ -93,6 +93,25 @@ static void rearm(void) {
   control_base = run;
 }
 
+struct trace_wait {
+  uint64_t last_progress_ms;
+  uint32_t capture_state;
+};
+
+/* A deadline from rearm can bisect the first frame after the TX lead-in.
+ * Observe both the active flag and symbol count: a live capture earns a full
+ * inactivity interval, but a stalled capture still times out. A bounded trace
+ * has at most 128 count increments; duration_ms remains an absolute run limit. */
+static int trace_wait_expired(struct trace_wait *wait, uint64_t now,
+                              uint64_t timeout_ms, uint32_t status) {
+  uint32_t state = status & 0x1ffu;
+  if (state != wait->capture_state) {
+    wait->capture_state = state;
+    wait->last_progress_ms = now;
+  }
+  return now - wait->last_progress_ms > timeout_ms;
+}
+
 int main(int argc, char **argv) {
   long count = argc > 1 ? atol(argv[1]) : 0;
   long timeout_ms = argc > 2 ? atol(argv[2]) : 5000;
@@ -141,12 +160,12 @@ int main(int argc, char **argv) {
     uint32_t drop_before = REG(METRICS) & 0xffffu;
     select_page(SYMBOL_PAGE);
     if (got == 0) printf("READY %" PRIu64 "\n", now_ms() - t0);
-    uint64_t start = now_ms();
+    struct trace_wait wait = {now_ms(), 0};
     uint32_t status = 0;
     for (;;) {
       status = REG(STATUS);
       if ((status >> 16) == 0x5359u && (status & 0x200u) && !(status & 0x100u)) break;
-      if (stop || now_ms() - start > (uint64_t)timeout_ms) break;
+      if (stop || trace_wait_expired(&wait, now_ms(), (uint64_t)timeout_ms, status)) break;
       if (duration_ms && now_ms() - t0 >= (uint64_t)duration_ms) break;
       sleep_us(500);
     }
