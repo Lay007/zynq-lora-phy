@@ -21,19 +21,22 @@ companion [`zynq-sdr-course`](https://github.com/Lay007/zynq-sdr-course). The
 [project-boundary ADR](docs/architecture-decisions/0003-course-project-boundary.md)
 defines why generated LoRa HDL is not duplicated there.
 
-> Status: MATLAB M1 and the streaming fixed-point M2 path are complete, with
-> generated M3 Verilog, exact 8/8 HDL cosimulation for ToA, Vivado IP packaging,
-> a routed CLG400 board design, and a cold-bootable ZynqSDR image. Hardware
-> reception is now demonstrated: real over-the-air Heltec V4.3/SX1262 packets
-> decode on ZynqSDR with valid explicit header and payload CRC. In the latest
-> 500-attempt M7 guard-image campaign, 492 packets were captured and all 492
-> passed CRC with zero PL grid errors; the other attempts included five
-> transmitter-side failures and three PL detector misses. The M6 continuous PL
-> sample-time counter was also verified across 47 captures spanning 803.7 s.
-> Controlled cable-delay calibration, the 1,000-packet qualification target,
-> common-time synchronization across receivers, and hardware multi-receiver
-> TDoA positioning remain open, so the repository does not yet claim a
-> synchronized positioning system.
+> Status as of 2026-10-02: the MATLAB → Simulink → generated Verilog →
+> cold-bootable ZynqSDR/CLG400 path is implemented. Real over-the-air SX1262
+> packets pass explicit-header and payload CRC checks; FPGA SF7/BW125 PER
+> curves are published for CR 4/5 through 4/8. M11 fixes correlation-peak
+> precision: the measured CR 4/5 PER 10% threshold is about −7.8 dB, versus
+> −8.2 dB for the known-timing model
+> ([method and results](docs/per-curves-experiment.md)). These are conducted
+> measurements at specified SNR, not absolute sensitivity in dBm.
+>
+> RTL regressions cover accelerated joint ToA/CFO search, real SFD framing,
+> consecutive packets without reset, and recovery from zero or missing
+> interpolation responses. Bench tools support separately regenerated FPGA
+> profiles for SF5–SF12/BW500. The committed DSP core remains SF7/L8: each new
+> mode requires regeneration, full-packet RTL checks, routed timing sign-off
+> and hardware measurements. Common-time synchronization of two receivers,
+> systematic-delay calibration and hardware TDoA positioning remain open.
 
 ## Project goals
 
@@ -55,14 +58,11 @@ and measurement-driven verification. For consulting or project collaboration,
 see the [engineering portfolio](https://lay007.github.io/) or
 [GitHub profile](https://github.com/Lay007).
 
-
-The current hardware qualification focus is deliberately narrow:
-
-> Stabilize and quantify the SF7 / BW 125 kHz hardware receiver, complete the
-> controlled packet/PER campaign, calibrate the single-receiver timing chain,
-> and only then extend the validated timestamp path to synchronized
-> multi-receiver TDoA. MATLAB, Simulink, generated HDL, raw IQ, PL metadata, and
-> hardware measurements remain tied to shared acceptance evidence.
+Current work measures PER and precise-timestamp availability versus SNR,
+extends the FPGA receiver to other SF/BW modes, and compares it with
+SX1262/LR1121 on the same signal. CRC-valid reception and usable ToA are
+separate outcomes. Single-receiver repeatability does not establish TDoA
+accuracy; that requires common time and calibrated receive paths.
 
 ## Current contents
 
@@ -96,6 +96,8 @@ Generate the acquisition, uncoded CSS, and coded packet BER/PER figures:
 
 ```matlab
 outputs = run_visualizations;
+addpath examples
+figures = redraw_ber_campaign; % README curves from saved counts
 ```
 
 Inspect RTL-SDR CU8, Pluto/GNU Radio CF32, or CI16/HDL recordings visually.
@@ -147,6 +149,19 @@ interleaving, and Gray/CSS mapping with all intermediate values exposed.
 ![Current CSS demodulator versus coherent reference](docs/images/css-ber-current-vs-ideal.png)
 
 ![Coded LoRa BER and PER for SF5 through SF7](docs/images/lora-coded-ber-sf5-sf7-fft-correlator.png)
+
+Lines connect only positive observed BER/PER. Unconnected downward triangles
+show the **two-sided 95% Wilson upper bound for a zero-error run**, not a
+positive observed error probability. The uncoded campaign uses 4,000 symbols
+per point; the coded campaign uses 200 packets with 16-byte payloads. Counts
+and intervals remain in the [source CSVs](docs/ber-methodology.md).
+
+Hardware FPGA SF7/BW125 PER curves for CR 4/5 through 4/8 and model comparisons
+are in the [bench report](docs/per-curves-experiment.md). The
+[finite-series protocol](docs/finite-per-bench.md) accounts for every planned
+transmission, including leading/trailing losses, and checks ToA separately.
+[Joint-search latency](docs/joint-search-latency.md) is reported with its
+scope: RTL timing does not establish total hardware processing latency.
 
 ## What the BER figure means
 

@@ -16,21 +16,22 @@ resultsCr1 = lora_phy.simulate_coded_ber(snrDb, configCr1, 100, 16, 19);
 resultsCr4 = lora_phy.simulate_coded_ber(snrDb, configCr4, 100, 16, 23);
 
 figureHandle = figure("Color", "white", "Position", [100, 100, 860, 540]);
-semilogy(snrDb, display_rate(resultsCr1.PayloadBER, resultsCr1.PayloadBits), ...
+plot_error_rate(gca, snrDb, resultsCr1.PayloadBER, resultsCr1.PayloadBits, ...
     "o-", "LineWidth", 1.5, "DisplayName", "Payload BER, CR 4/5");
 hold on;
-semilogy(snrDb, display_rate(resultsCr4.PayloadBER, resultsCr4.PayloadBits), ...
+plot_error_rate(gca, snrDb, resultsCr4.PayloadBER, resultsCr4.PayloadBits, ...
     "s-", "LineWidth", 1.5, "DisplayName", "Payload BER, CR 4/8");
-semilogy(snrDb, display_rate(resultsCr1.PER, resultsCr1.Packets), ...
+plot_error_rate(gca, snrDb, resultsCr1.PER, resultsCr1.Packets, ...
     "o--", "LineWidth", 1.3, "DisplayName", "PER, CR 4/5");
-semilogy(snrDb, display_rate(resultsCr4.PER, resultsCr4.Packets), ...
+plot_error_rate(gca, snrDb, resultsCr4.PER, resultsCr4.Packets, ...
     "s--", "LineWidth", 1.3, "DisplayName", "PER, CR 4/8");
 grid on;
 xlabel("SNR per complex sample, dB");
 ylabel("Error probability");
 title("LoRa packet coding in AWGN, SF7, 16-byte payload");
 legend("Location", "southwest");
-ylim([1e-5, 1]);
+ylim([1e-5, 1.05]);
+subtitle("Unconnected triangles: zero errors, 95% Wilson upper bound");
 
 outputDirectory = fileparts(outputPath);
 if ~isfolder(outputDirectory)
@@ -43,8 +44,4 @@ if ~isfolder(dataDirectory)
 end
 writetable(resultsCr1, fullfile(dataDirectory, "lora-coded-ber-sf7-cr1.csv"));
 writetable(resultsCr4, fullfile(dataDirectory, "lora-coded-ber-sf7-cr4.csv"));
-end
-
-function shown = display_rate(rate, trials)
-shown = max(rate, 0.5./trials);
 end
