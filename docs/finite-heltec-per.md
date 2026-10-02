@@ -78,6 +78,13 @@ Long SF12 waveforms need small batches: templates are uploaded to the board's
 RAM filesystem. The harness checks batch size and available space before TX.
 Use distinct `--first-sequence` ranges and preserve each finite batch before
 aggregating counts. Do not average batches with unequal denominators.
+For repeated SNR points of one batch, `--template-cache-dir
+/tmp/lora-finite-cache-<32 hex digits>` may retain one owned template between
+invocations. Every reuse verifies its SHA-256 against the host template; a
+mismatch retires only that cache file and forces a verified upload. A matching
+template is hard-linked to the finite run and needs no second RAM-sized copy.
+The caller retires the cache file and its directory after the campaign. Per-run
+source snapshots, TX seeds, generator summaries and counters are still retained.
 Report binomial uncertainty: zero losses in N trials has a one-sided 95%
 upper bound `1 - 0.05**(1/N)`, approximately 3/N.
 

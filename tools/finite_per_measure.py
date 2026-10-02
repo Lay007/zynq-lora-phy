@@ -49,6 +49,37 @@ def generator_summary(text: str) -> dict:
     return {key: int(value) for key, value in (item.split('=') for item in lines[0].split()[1:])}
 
 
+def stage_templates(c, tpl, prefix, cache_dir=None):
+    """Reuse only a content-verified template in one explicitly owned /tmp cache."""
+    expected = sha256(tpl)
+    cached = None
+    reused = False
+    if cache_dir:
+        if not re.fullmatch(r'/tmp/lora-finite-cache-[0-9a-f]{32}', cache_dir):
+            raise ValueError('template cache must be /tmp/lora-finite-cache-<32 hex digits>')
+        cached = cache_dir + '/templates.c64'
+        bench.run(c, f'mkdir -p {cache_dir}; test ! -L {cache_dir}')
+        reply = bench.run(c, f'if [ -f {cached} ]; then sha256sum {cached}; fi').split()
+        reused = bool(reply and reply[0] == expected)
+        if not reused:
+            # Retire only the single file owned by this explicitly named cache.
+            bench.run(c, f'rm -f {cached}')
+    free_kib = int(bench.run(c, 'df -k /tmp').splitlines()[-1].split()[3])
+    required = (0 if reused else tpl.stat().st_size) + 32*1024**2
+    if required > free_kib*1024:
+        raise RuntimeError('insufficient board /tmp space for finite templates and logs; reduce batch size')
+    if reused:
+        bench.run(c, f'ln {cached} {prefix}.c64')
+    else:
+        bench.put(c, tpl, prefix + '.c64')
+        if cached:
+            remote = bench.run(c, f'sha256sum {prefix}.c64').split()[0]
+            if remote != expected:
+                raise RuntimeError('uploaded template SHA256 differs from host source')
+            bench.run(c, f'ln {prefix}.c64 {cached}')
+    return dict(directory=cache_dir, reused=reused, sha256=expected)
+
+
 def start_tx(c, args, prefix, spp, snr, seed, padded, max_seconds):
     """Launch the finite generator/writer and expose both exit statuses."""
     gap, lead, tail = int(args.gap*args.tx_rate), int(args.tx_rate), int(2*args.tx_rate)
@@ -178,7 +209,10 @@ def main() -> int:
     parser.add_argument('--templates', type=Path, help='prebuilt uniquely numbered complex64 templates and .json sidecar')
     parser.add_argument('--allow-unrecognized-rx', action='store_true',
                         help='controlled conducted serial delivery test: retain unknown outputs as errors; require exact planned payloads')
+    parser.add_argument('--template-cache-dir', help='owned /tmp/lora-finite-cache-<32 hex digits>; caller retires it after the campaign')
     args = parser.parse_args()
+    if args.template_cache_dir and not re.fullmatch(r'/tmp/lora-finite-cache-[0-9a-f]{32}', args.template_cache_dir):
+        parser.error('template cache must be /tmp/lora-finite-cache-<32 hex digits>')
     if ((args.receiver == 'pl' and (args.sf != 7 or args.bw != 125))
             or not 7 <= args.sf <= 12 or args.bw not in (125,250,500)
             or not 1 <= args.cr <= 4 or args.tx_rate != 1e6
@@ -262,12 +296,9 @@ def main() -> int:
         report['tx_profile'] = bench.run(c, f'cat {bench.PHY}/out_voltage_sampling_frequency {bench.PHY}/out_voltage_filter_fir_en {bench.PHY}/out_voltage_rf_bandwidth')
         if report['tx_profile'].split()[:2] != ['1000000','1']:
             raise RuntimeError('TX rate/FIR differs from the qualified 1MS/s profile')
-        free_kib = int(bench.run(c, 'df -k /tmp').splitlines()[-1].split()[3])
-        if tpl.stat().st_size+32*1024**2 > free_kib*1024:
-            raise RuntimeError('insufficient board /tmp space for finite templates and logs; reduce batch size')
+        report['template_cache'] = stage_templates(c, tpl, prefix, args.template_cache_dir)
         for name, target in [('lora_trace_stream', '.trace'), ('lora_tx_noise', '.noise')]:
             bench.put(c, args.bin_dir / name, prefix + target)
-        bench.put(c, tpl, prefix + '.c64')
         bench.run(c, f'chmod +x {prefix}.trace {prefix}.noise')
         if args.receiver == 'pl':
             bench.run(c, 'devmem 0x79040404 32 0x1203; sleep 0.1; devmem 0x79040404 32 0x1201')

@@ -125,11 +125,14 @@ def measure_serial(c,args,prefix,spp,snr,seed,checkpoint,start_tx,generator_summ
                         raise RuntimeError('receiver: '+line)
                 return line
             def command(cmd,expected):
-                port.write((cmd+'\n').encode('ascii'))
-                deadline=time.monotonic()+5
-                while time.monotonic()<deadline:
-                    line=receive(deadline)
-                    if line is not None and line.startswith(expected): return line
+                # Preserve the same open connection and final packet counter
+                # if a read-only profile reply is transiently missed.
+                for _ in range(3 if cmd=='show' else 1):
+                    port.write((cmd+'\n').encode('ascii'))
+                    deadline=time.monotonic()+5
+                    while time.monotonic()<deadline:
+                        line=receive(deadline)
+                        if line is not None and line.startswith(expected): return line
                 raise TimeoutError('receiver command: '+cmd)
             command('rx stop','OK stopped')
             for cmd in (f'set sf {args.sf}', f'set bw {args.bw:g}', f'set cr {args.cr+4}',
