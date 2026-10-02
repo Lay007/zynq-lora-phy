@@ -67,6 +67,18 @@ Final counter continuity, complete finite TX and exact payload checks remain
 mandatory. State the selected policy with the results; do not use the option
 to qualify uncontrolled over-the-air sensitivity trials.
 
+For a controlled delivered-packet test, `--allow-malformed-rx` can retain a
+damaged RX line as a delivery loss when its event counter is intact and unique.
+The complete raw line and parse error are saved; no payload or missing metadata
+is recovered. Counters must remain consecutive and agree with the final receiver
+count, and finite TX must still complete. Missing/ambiguous counters remain fatal.
+`serial_parse_errors` is separate from radio CRC failures. With a damaged line,
+`serial_transport_complete` is false even when event counts are complete and
+the explicitly selected delivered-packet measurement remains valid. The default
+strict policy rejects such lines; the permissive policy does not establish RF
+sensitivity. A malformed output contributes no successful planned ID; callers
+qualifying strong controls must also require zero `serial_parse_errors`.
+
 LR1121 RX firmware 0.2.1 also records IRQ, RX_DONE, RX buffer offset and the
 CRC-presence flag read from the last explicit header before clearing its buffer.
 If this metadata is present, the host requires RX_DONE, a successful header
