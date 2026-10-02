@@ -2,9 +2,11 @@
 
 [Русская версия](ru/per-curves-experiment.md)
 
-Status: 2026-09-28. The ideal curves are computed; the bench tools are built and
-tested piecewise (see *State*); the first measured curve waits for the cable
-set-up below.
+Status: 2026-10-02. Finite bench tools support matched experimental FPGA
+profiles for BW500/SF5..12. The committed generated core remains SF7/L8.
+Changing wrapper parameters alone does not create a receiver for another mode.
+Each new image requires DSP regeneration, a matching reference ROM, full-packet
+RTL verification, routed timing sign-off and hardware qualification.
 
 ## Goal
 
@@ -18,11 +20,46 @@ three receivers on **the same signal**, next to the ideal:
 | LR1121 | LILYGO T3-S3 V1.2 running `firmware/lilygo-t3s3-lr1121-rx` |
 | SX1262 | Heltec WiFi LoRa 32 V4 running `firmware/heltec-v4-sx1262-rx` |
 
-Modes: SF 7..12, BW 125/250/500 kHz, CR 4/5..4/8; 32-byte payload, explicit
+Modes: SF5..12, BW 125/250/500 kHz, CR 4/5..4/8; 32-byte payload, explicit
 header, payload CRC on, preamble 12, sync word 0x12, LDRO on for SF11/12 at
 125 kHz. The PL receiver is built for SF7/BW125 only: CR 4/5..4/8 can be
 measured on it now (coding is decoded on the host); other SF/BW need a
 regenerated correlator per mode (the roadmap at the end).
+
+For a separately regenerated BW500 image at 1 MS/s, use
+`tools/finite_per_measure.py --receiver pl --pl-wideband --sf <5..12> --bw 500`
+with explicitly built measurement binaries (`tools/build_per_tools.py`). The
+harness verifies the FPGA SF/L profile before enabling TX, captures enough
+symbols for the packet, and decodes SF9..12 symbols as 16-bit integers.
+`--rms-dbfs` sets total stream RMS; inspect the generator's clipping count.
+Only complete finite, unclipped TX batches and CRC/full-payload matches are
+accepted for PER. Keep software IQ diagnostics separate from FPGA outcomes.
+
+SF5/SF6 TX includes two extra bin-1 upchirps after the 2.25-downchirp SFD
+for the supported SX1262/LR1121 framing. All upchirps have consistent phase.
+
+The build profile page is CONTROL bit 5, STATUS `0x5742SFLL`. Runtime capture
+length requires CONTROL bit 6; bits 31 and 23:19 encode pairs (zero means 128).
+Without bit 6, the shared decision-history address bits retain legacy behavior.
+The profile declares compile-time parameters; it does not replace source hashes,
+DSP regeneration or build qualification. The four CR use one image per SF/BW.
+
+The joint estimator rejects zero-valued interpolation triplets and bounds a
+missing fractional response to 64 clocks. It returns the withheld symbol-grid
+guard and declines the precise timestamp for that packet; later packets remain
+processable. A valid generated interpolation completes within 38 clocks.
+
+Trace records also expose the hardware clock-page counters: sample interval,
+minimum sample interval, last MAC busy duration, and completed MAC searches.
+`mac_search_clocks / 62.5` is microseconds for the fixed 62.5 MHz board clock.
+It measures the last MAC search, not the complete detection-to-ToA latency;
+do not equate it with a host collection timestamp or a ranging delay.
+
+`--preserve-pl-state` skips the batch's full PL stream reset for explicit
+continuity experiments. Configure RF and reset PL in the first batch, then
+use this flag without `--restore-profile`. Return to a strong signal after
+the weak batches to check recovery without a receiver reset. Trace rearming
+still releases the capture buffer; it does not reset the joint estimator.
 
 ## Method: noise added in digital, not by attenuation
 
@@ -32,7 +69,7 @@ dBm against a noise floor of about -120 dBm in 125 kHz, i.e. +50 dB SNR, while
 the curves live between -24 and 0 dB. Getting there needs another 50-60 dB and
 a shielded box (at those levels the transmitter couples past the cable).
 
-Instead the **CLG400's own AD9361 transmitter is a calibrated source**:
+Instead the **CLG400's own AD9361 transmitter supplies digitally specified SNR**:
 
 1. `tools/lora_tx_waveform.py --templates` makes clean packets on the host
    (the project's modulator and encoder; distinct sequence numbers).

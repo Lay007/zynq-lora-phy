@@ -17,6 +17,7 @@
 `endif
 
 module lora_detector_timestamp_path #(
+    parameter integer SPREADING_FACTOR = 7,
     parameter integer QUALIFY_PREAMBLE_TIMESTAMP = 0
 ) (
     input  wire        clk,
@@ -128,7 +129,7 @@ module lora_detector_timestamp_path #(
     //    symbol from the correlator window, which is what the bin measures;
     //    on the board it was 55..66 and the seven rescued packets that
     //    decoded were 58..64. Silence's bin 0 is far outside.
-    localparam [15:0] BIN_MASK = 16'd127; // 2^SF - 1 for the SF7 build
+    localparam [15:0] BIN_MASK = (1 << SPREADING_FACTOR) - 1;
 
     reg [15:0] prev_bin [0:8]; // [0] oldest ... [8] newest previous symbol
     reg [8:0]  prev_present;   // matching 'correlator saw a signal' bits

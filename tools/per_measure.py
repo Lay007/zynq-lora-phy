@@ -46,7 +46,8 @@ def ssh(password: str, host: str = "192.168.40.1", known_hosts: Path | None = No
     c = paramiko.SSHClient()
     c.load_host_keys(str(known_hosts if known_hosts is not None else KNOWN_HOSTS))
     c.set_missing_host_key_policy(paramiko.RejectPolicy())
-    c.connect(host, username="root", password=password, timeout=15,
+    c.connect(host, username="root", password=password, timeout=60,
+              banner_timeout=60, auth_timeout=60,
               look_for_keys=False, allow_agent=False)
     return c
 

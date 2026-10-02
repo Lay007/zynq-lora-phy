@@ -143,6 +143,9 @@ module lora_joint_chirp_grid_controller #(
     localparam signed [65:0] TIMING_ROUND_BIAS_Q12x2 = 66'sd4096;
 
     reg [3:0] state;
+    // Valid interpolation takes at most 38 clocks. A missing response
+    // must retire this packet, not prevent every later packet.
+    reg [6:0] interpolation_wait;
     reg [63:0] up_coarse_start;
     reg [63:0] down_coarse_start;
     reg signed [64:0] up_offset_int;
@@ -288,6 +291,7 @@ module lora_joint_chirp_grid_controller #(
     always @(posedge clk) begin
         if (!resetn || stream_reset) begin
             state                     <= STATE_IDLE;
+            interpolation_wait        <= 7'd0;
             up_coarse_start           <= 64'd0;
             down_coarse_start         <= 64'd0;
             up_offset_int             <= 65'sd0;
@@ -322,6 +326,9 @@ module lora_joint_chirp_grid_controller #(
             epoch_retry_allowed       <= 1'b0;
             epoch_retried             <= 1'b0;
         end else begin
+            if (state == STATE_WAIT_UP_FRAC || state == STATE_WAIT_DOWN_FRAC)
+                interpolation_wait <= interpolation_wait + 7'd1;
+            else interpolation_wait <= 7'd0;
             search_start       <= 1'b0;
             fine_resync_valid  <= 1'b0;
             timing_valid       <= 1'b0;
@@ -407,9 +414,9 @@ module lora_joint_chirp_grid_controller #(
                 end
 
                 STATE_WAIT_UP_FRAC: begin
-                    // The interpolator has no failure path and a fixed
-                    // latency (38 cycles, 6 for a flat triplet): this pulse
-                    // is guaranteed to arrive, nothing to abort here.
+                    // Valid triplets complete in <=38 clocks. Zero
+                    // magnitudes are rejected upstream; the watchdog
+                    // below retires a missing fractional response.
                     if (search_offset_valid) begin
                         up_offset_frac_q12 <= search_offset_q12;
                         prefetch_valid <= 1'b1;
@@ -526,6 +533,25 @@ module lora_joint_chirp_grid_controller #(
                     state <= STATE_IDLE;
                 end
             endcase
+            // A zero triplet is rejected upstream; this also bounds a
+            // lost response. Valid responses win on the deadline.
+            if ((state == STATE_WAIT_UP_FRAC || state == STATE_WAIT_DOWN_FRAC)
+                && !search_offset_valid && interpolation_wait == 7'd63) begin
+                prefetch_valid <= 1'b0;
+                busy <= 1'b0;
+                state <= STATE_IDLE;
+                fine_skip <= FINE_GUARD_U64[31:0];
+                if (speculative) begin
+                    if (confirmed || packet_start_valid) begin
+                        busy <= 1'b1;
+                        state <= STATE_WAIT_PACKET;
+                    end
+                end else begin
+                    fine_resync_valid <= 1'b1;
+                    if (state == STATE_WAIT_UP_FRAC) up_search_abort_error <= 1'b1;
+                    else down_search_abort_error <= 1'b1;
+                end
+            end
         end
     end
 

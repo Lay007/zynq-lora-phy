@@ -30,20 +30,31 @@ def parse_record(line: str) -> dict:
                     "drop_before", "drop_after", "p0fresh", "changed")
         record.update({name: int(fields[name], 0) for name in integers})
         for name in ('joint_correction', 'joint_up_offset', 'joint_up_coarse',
-                     'joint_packet_start', 'joint_phase_bin'):
+                     'joint_packet_start', 'joint_phase_bin', 'sample_interval_clocks',
+                     'sample_interval_min_clocks', 'mac_search_clocks', 'mac_search_completed'):
             if name in fields: record[name] = int(fields[name], 0)
         n = record["n"]
         symbols = fields["sym"]
-        if not 1 <= n <= 128 or len(symbols) != 256 or not re.fullmatch(r"[0-9a-fA-F]+", symbols):
+        sf = int(fields.get('sf', '7'))
+        bits = int(fields.get('sym_bits', '8'))
+        if not 5 <= sf <= 12 or bits not in (8, 16) or (sf > 8 and bits != 16):
+            raise ValueError('invalid SF/symbol width')
+        digits = bits // 4
+        if not 1 <= n <= 128 or len(symbols) != digits*128 or not re.fullmatch(r"[0-9a-fA-F]+", symbols):
             raise ValueError("invalid symbol trace length/encoding")
+        values = [int(symbols[k:k+digits], 16) for k in range(0, digits*n, digits)]
+        if any(value >= 1 << sf for value in values):
+            raise ValueError('symbol outside configured SF')
         for name in ("changed", "p0fresh", "realigned"):
             if record[name] not in (0, 1):
                 raise ValueError("invalid boolean flag")
         if not 0 <= record["p0coarse"] < 2**64 or not -(2**31) <= record["p0frac"] < 2**31:
             raise ValueError("timestamp out of range")
-        record.update(kind="packet", capture_valid=record["changed"] == 0, sym=symbols[:2*n])
-        result = decode_lora_symbol_trace(list(bytes.fromhex(record["sym"])),
+        record.update(kind="packet", capture_valid=record["changed"] == 0,
+                      sym=symbols[:digits*n], spreading_factor=sf, symbol_bits=bits)
+        result = decode_lora_symbol_trace(values,
                                          0 if record["realigned"] else record["pbin"],
+                                         spreading_factor=sf,
                                          require_payload_crc=True).result
         # This finite bench sends explicit-header packets with payload CRC.
         # The general decoder accepts CRC-disabled packets by design; a noisy

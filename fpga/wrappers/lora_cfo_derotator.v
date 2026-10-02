@@ -27,6 +27,8 @@
 // off the output is the input sample itself, bit for bit, so behaviour with no
 // estimate is unchanged.
 module lora_cfo_derotator #(
+    parameter integer SPREADING_FACTOR = 7,
+    parameter integer SAMPLES_PER_CHIP = 8,
     parameter integer ITERATIONS = 16
 ) (
     input  wire               clk,
@@ -55,6 +57,13 @@ module lora_cfo_derotator #(
     output wire               rotating
 );
     localparam integer LATENCY = ITERATIONS + 3;
+    // Q12 sample displacement / (N*L*L) cycles/sample, in Q32 turns.
+    localparam integer PHASE_SHIFT = 20 - SPREADING_FACTOR - 2*$clog2(SAMPLES_PER_CHIP);
+    initial begin
+        if (SPREADING_FACTOR < 5 || SPREADING_FACTOR > 12 || SAMPLES_PER_CHIP < 1 ||
+            (SAMPLES_PER_CHIP & (SAMPLES_PER_CHIP-1)) != 0)
+            $error("CFO derotator requires SF5..12 and power-of-two L");
+    end
 
     // atan(2^-i) in units of 2^20 per turn (generated, rounded).
     function automatic [19:0] atan_turns(input integer i);
@@ -92,7 +101,7 @@ module lora_cfo_derotator #(
             phase_acc <= 32'd0;
         end else if (load) begin
             rotate_en <= 1'b1;
-            phase_inc <= cfo_q12 <<< 7;
+            phase_inc <= PHASE_SHIFT >= 0 ? (cfo_q12 <<< PHASE_SHIFT) : (cfo_q12 >>> -PHASE_SHIFT);
             phase_acc <= 32'd0;
         end else if (in_valid && rotate_en) begin
             phase_acc <= phase_acc + phase_inc;

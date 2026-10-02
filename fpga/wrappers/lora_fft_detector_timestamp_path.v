@@ -7,6 +7,8 @@
 // historical generic DUT name and future ModulePrefix regeneration share one
 // integration boundary. All symbol/timestamp sidebands remain cycle-aligned.
 module lora_fft_detector_timestamp_path #(
+    parameter integer SPREADING_FACTOR = 7,
+    parameter integer SAMPLES_PER_CHIP = 8,
     parameter integer QUALIFY_PREAMBLE_TIMESTAMP = 0
 ) (
     input  wire               clk,
@@ -64,7 +66,8 @@ module lora_fft_detector_timestamp_path #(
     wire               rot_resync_valid;
     wire [31:0]        rot_resync_skip;
 
-    lora_cfo_derotator u_cfo_derotator (
+    lora_cfo_derotator #(.SPREADING_FACTOR(SPREADING_FACTOR),
+        .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP)) u_cfo_derotator (
         .clk(clk),
         .resetn(resetn),
         .in_re(iq_in_re),
@@ -109,6 +112,7 @@ module lora_fft_detector_timestamp_path #(
     // detector enabled whenever the FFT path is enabled preserves HDL Coder's
     // state-update semantics while allowing arbitrary gaps in valid_in.
     lora_detector_timestamp_path #(
+        .SPREADING_FACTOR(SPREADING_FACTOR),
         .QUALIFY_PREAMBLE_TIMESTAMP(QUALIFY_PREAMBLE_TIMESTAMP)
     ) u_detector_timestamp (
         .clk(clk),

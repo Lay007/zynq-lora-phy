@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import finite_bench as bench
-from finite_per_measure import generator_summary, save
+from finite_per_measure import arm_pl_receiver, generator_summary, save
 import per_measure
 from analyze_finite_toa import analyze
 
@@ -54,6 +54,34 @@ def test_full_timestamp_retains_64_bit_precision_and_raw_record(decode):
     assert r['toa_valid'] and r['seq'] == 12
 
 
+def test_hardware_clock_diagnostics_are_optional_and_lossless(decode):
+    legacy = bench.parse_record(line())
+    assert legacy['kind'] == 'packet' and 'mac_search_clocks' not in legacy
+    current = bench.parse_record(line(sample_interval_clocks='63',
+        sample_interval_min_clocks='62', mac_search_clocks='18400', mac_search_completed='2'))
+    assert current['kind'] == 'packet' and current['toa_valid']
+    assert current['mac_search_clocks'] == 18400
+    assert current['mac_search_completed'] == 2
+    assert current['sample_interval_clocks'] == 63
+    assert current['sample_interval_min_clocks'] == 62
+
+
+def test_continuity_batch_never_writes_a_receiver_reset(monkeypatch):
+    calls=[]
+    monkeypatch.setattr(per_measure, 'run', lambda c, command: calls.append(command) or '0x00001201')
+    assert arm_pl_receiver(None, True) == 'preserved; trace rearm only'
+    assert calls == ['devmem 0x79040404 32']
+
+
+@pytest.mark.parametrize('control', ['0x1200', '0x1202', '0x1203'])
+def test_continuity_rejects_a_disabled_or_reset_receiver(monkeypatch, control):
+    calls=[]
+    monkeypatch.setattr(per_measure, 'run', lambda c, command: calls.append(command) or control)
+    with pytest.raises(RuntimeError, match='Continuity'):
+        arm_pl_receiver(None, True)
+    assert calls == ['devmem 0x79040404 32']
+
+
 @pytest.mark.parametrize('fields,reason', [({'changed': '1'}, 'snapshot_changed'),
     ({'p0fresh': '0'}, 'stale_metadata'), ({'drop_after': '3'}, 'sample_drop'),
     ({'joint': '0x4a540003'}, 'joint_not_applied'),
@@ -73,6 +101,30 @@ def test_malformed_attempt_is_not_dropped(raw):
 
 def test_timeout_status_is_preserved():
     assert bench.parse_record('TIMEOUT 10 status=0x53590000')['status'] == 0x53590000
+
+
+@pytest.mark.parametrize('sf', range(5, 13))
+@pytest.mark.parametrize('cr', range(1, 5))
+def test_full_payload_from_wide_symbol_trace(sf, cr):
+    from zynq_lora_phy import encode_lora_packet
+    from lora_per_ideal import test_payload
+    payload = test_payload(12)
+    symbols = list(encode_lora_packet(payload, spreading_factor=sf, coding_rate=cr).symbols)
+    bits = 16 if sf > 8 else 8
+    digits = bits // 4
+    packed = ''.join(f'{int(v):0{digits}x}' for v in symbols).ljust(digits*128, '0')
+    raw = line(n=str(len(symbols)), sf=str(sf), sym_bits=str(bits), sym=packed)
+    r = bench.parse_record(raw)
+    assert r['kind'] == 'packet' and r['crc'] and r['payload_hex'] == payload.hex()
+    assert r['spreading_factor'] == sf and r['symbol_bits'] == bits
+    assert bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)['per'] == 0
+
+
+@pytest.mark.parametrize('overrides', [dict(sf='12'), dict(sf='4'), dict(sf='13'),
+    dict(sf='7', sym_bits='12'), dict(sf='7', sym='80'+'00'*127)])
+def test_bad_wide_trace_contract_is_preserved_as_invalid(overrides):
+    record = bench.parse_record(line(**overrides))
+    assert record['kind'] == 'invalid' and not record['capture_valid']
 
 
 def packet(seq):
