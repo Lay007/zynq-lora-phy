@@ -49,6 +49,16 @@ def generator_summary(text: str) -> dict:
     return {key: int(value) for key, value in (item.split('=') for item in lines[0].split()[1:])}
 
 
+def arm_pl_receiver(c, preserve_state: bool) -> str:
+    if preserve_state:
+        control = int(bench.run(c, 'devmem 0x79040404 32').strip(), 0)
+        if not control & 1 or control & 2:
+            raise RuntimeError('Continuity requires an enabled, non-reset PL receiver')
+        return 'preserved; trace rearm only'
+    bench.run(c, 'devmem 0x79040404 32 0x1203; sleep 0.1; devmem 0x79040404 32 0x1201')
+    return 'full stream reset'
+
+
 def stage_templates(c, tpl, prefix, cache_dir=None):
     """Reuse only a content-verified template in one explicitly owned /tmp cache."""
     expected = sha256(tpl)
@@ -215,6 +225,8 @@ def main() -> int:
                         help='RMS of the complete signal+noise stream; reduce for short high-SNR packets')
     parser.add_argument('--seed', type=int, default=1000)
     parser.add_argument('--restore-profile', action='store_true')
+    parser.add_argument('--preserve-pl-state', action='store_true',
+                        help='continuity experiment: keep the already configured PL receiver running between batches')
     parser.add_argument('--pl-wideband', action='store_true',
                         help='experimental SF5..12/BW500/L2 image; hardware profile must match')
     parser.add_argument('--out', type=Path, required=True)
@@ -223,6 +235,8 @@ def main() -> int:
                         help='controlled conducted serial delivery test: retain unknown outputs as errors; require exact planned payloads')
     parser.add_argument('--template-cache-dir', help='owned /tmp/lora-finite-cache-<32 hex digits>; caller retires it after the campaign')
     args = parser.parse_args()
+    if args.preserve_pl_state and (args.receiver != 'pl' or args.restore_profile):
+        parser.error('preserve PL state requires receiver=pl and an already configured RF profile')
     if args.template_cache_dir and not re.fullmatch(r'/tmp/lora-finite-cache-[0-9a-f]{32}', args.template_cache_dir):
         parser.error('template cache must be /tmp/lora-finite-cache-<32 hex digits>')
     if ((args.receiver == 'pl' and not args.pl_wideband and (args.sf != 7 or args.bw != 125))
@@ -300,8 +314,14 @@ def main() -> int:
             if args.pl_wideband:
                 # Page 5 returns compile-time SF and L; a legacy image cannot
                 # silently become a wideband measurement by changing CLI flags.
-                profile_reply = bench.run(c, 'devmem 0x79040404 32 0x1221; sleep 0.02; '
-                                           'devmem 0x79040408 32; devmem 0x79040404 32 0x1201').splitlines()
+                control = int(bench.run(c, 'devmem 0x79040404 32').strip(),0)
+                if args.preserve_pl_state and (not control & 1 or control & 2):
+                    raise RuntimeError('Continuity requires an enabled, non-reset PL receiver')
+                try:
+                    profile_reply = bench.run(c, f'devmem 0x79040404 32 {hex(control|0x20)}; sleep 0.02; '
+                                               'devmem 0x79040408 32').splitlines()
+                finally:
+                    bench.run(c, f'devmem 0x79040404 32 {hex(control)}')
                 report['pl_build_profile'] = profile_reply[0].strip()
                 expected_profile = 0x57420000 | (args.sf << 8) | 2
                 if int(report['pl_build_profile'], 16) != expected_profile:
@@ -325,7 +345,7 @@ def main() -> int:
             bench.put(c, args.bin_dir / name, prefix + target)
         bench.run(c, f'chmod +x {prefix}.trace {prefix}.noise')
         if args.receiver == 'pl':
-            bench.run(c, 'devmem 0x79040404 32 0x1203; sleep 0.1; devmem 0x79040404 32 0x1201')
+            report['pl_state_initialization'] = arm_pl_receiver(c, args.preserve_pl_state)
         report['temps_start'] = bench.board_temps(c)
         report['tx_state'] = bench.tx_configure(c, args.tx_atten)
         report['gain_readback'] = bench.run(c, f'set -e; echo {args.rx_gain} > {bench.PHY}/in_voltage0_hardwaregain; '

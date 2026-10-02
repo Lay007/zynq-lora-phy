@@ -55,6 +55,12 @@ minimum sample interval, last MAC busy duration, and completed MAC searches.
 It measures the last MAC search, not the complete detection-to-ToA latency;
 do not equate it with a host collection timestamp or a ranging delay.
 
+`--preserve-pl-state` skips the batch's full PL stream reset for explicit
+continuity experiments. Configure RF and reset PL in the first batch, then
+use this flag without `--restore-profile`. Return to a strong signal after
+the weak batches to check recovery without a receiver reset. Trace rearming
+still releases the capture buffer; it does not reset the joint estimator.
+
 ## Method: noise added in digital, not by attenuation
 
 Attenuators alone cannot reach the interesting SNR range. The lowest Heltec

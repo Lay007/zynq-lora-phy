@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import finite_bench as bench
-from finite_per_measure import generator_summary, save
+from finite_per_measure import arm_pl_receiver, generator_summary, save
 import per_measure
 from analyze_finite_toa import analyze
 
@@ -64,6 +64,22 @@ def test_hardware_clock_diagnostics_are_optional_and_lossless(decode):
     assert current['mac_search_completed'] == 2
     assert current['sample_interval_clocks'] == 63
     assert current['sample_interval_min_clocks'] == 62
+
+
+def test_continuity_batch_never_writes_a_receiver_reset(monkeypatch):
+    calls=[]
+    monkeypatch.setattr(per_measure, 'run', lambda c, command: calls.append(command) or '0x00001201')
+    assert arm_pl_receiver(None, True) == 'preserved; trace rearm only'
+    assert calls == ['devmem 0x79040404 32']
+
+
+@pytest.mark.parametrize('control', ['0x1200', '0x1202', '0x1203'])
+def test_continuity_rejects_a_disabled_or_reset_receiver(monkeypatch, control):
+    calls=[]
+    monkeypatch.setattr(per_measure, 'run', lambda c, command: calls.append(command) or control)
+    with pytest.raises(RuntimeError, match='Continuity'):
+        arm_pl_receiver(None, True)
+    assert calls == ['devmem 0x79040404 32']
 
 
 @pytest.mark.parametrize('fields,reason', [({'changed': '1'}, 'snapshot_changed'),
