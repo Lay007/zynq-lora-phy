@@ -233,6 +233,8 @@ def main() -> int:
     parser.add_argument('--templates', type=Path, help='prebuilt uniquely numbered complex64 templates and .json sidecar')
     parser.add_argument('--allow-unrecognized-rx', action='store_true',
                         help='controlled conducted serial delivery test: retain unknown outputs as errors; require exact planned payloads')
+    parser.add_argument('--allow-malformed-rx', action='store_true',
+                        help='controlled delivery test: count malformed RX lines with intact event counters as losses; never recover payloads')
     parser.add_argument('--template-cache-dir', help='owned /tmp/lora-finite-cache-<32 hex digits>; caller retires it after the campaign')
     args = parser.parse_args()
     if args.preserve_pl_state and (args.receiver != 'pl' or args.restore_profile):

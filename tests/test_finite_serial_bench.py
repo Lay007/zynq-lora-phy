@@ -24,6 +24,29 @@ def test_losses_at_both_edges_are_in_denominator():
 def test_total_rf_loss_remains_a_valid_measurement():
     assert summary([])['per']==1
 
+def test_malformed_usb_output_is_an_explicit_delivery_loss_with_counter_continuity():
+    # Actual damaged line: the middle metadata disappeared while the remaining
+    # payload was still complete. It must never become a successful packet.
+    line = (f'RX n=2 state=0 code=0 len=32 rssi=-96.0header_crc=on '
+            f'header_code=0 buffer_offset=0 payload={payload(11).hex()}')
+    with pytest.raises(ValueError):
+        parse_rx(line)
+    broken = parse_rx(line, allow_malformed=True)
+    assert broken['raw']==line and broken['sequence'] is None and not broken['crc_valid']
+    rows = [record(10,1), broken, record(12,3)]
+    assert not summary(rows)['measurement_valid']
+    r = summary(rows, allow_malformed_rx=True)
+    assert r['measurement_valid'] and r['received_unique']==2 and r['per']==pytest.approx(.6)
+    assert r['serial_parse_errors']==1 and r['crc_fail']==0
+    assert r['serial_event_counts_complete'] and not r['serial_transport_complete']
+    assert not summary(rows,allow_malformed_rx=True,final_counter=4)['measurement_valid']
+    assert not summary(rows,allow_malformed_rx=True,tx_complete=False)['measurement_valid']
+
+@pytest.mark.parametrize('prefix', ['RX n=x', 'RX n=0', 'RX state=0', 'RX n=1 n=2'])
+def test_malformed_output_without_an_unambiguous_counter_stays_fatal(prefix):
+    with pytest.raises((ValueError,KeyError)):
+        parse_rx(prefix+' payload=bad',allow_malformed=True)
+
 def test_conducted_delivery_counts_unknown_outputs_without_adding_successes():
     # Observed LR1121 readData-success outputs: empty or a four-byte prefix
     # followed by a truncated planned payload. Preserve them as unknown outputs.

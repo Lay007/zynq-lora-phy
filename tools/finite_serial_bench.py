@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
 import math
+import re
 import time
 
 from lora_per_ideal import ldro_required, test_payload
@@ -30,7 +31,25 @@ def fields(line):
     return dict(item.split('=',1) for item in line.split()[1:] if '=' in item)
 
 
-def parse_rx(line):
+def parse_rx(line, *, allow_malformed=False):
+    try:
+        return _parse_rx(line)
+    except (ValueError, KeyError) as exc:
+        # An intact event counter lets a conducted delivery test retain a
+        # damaged output as a loss. Never infer missing metadata or recover a
+        # matching payload from that line. Missing/ambiguous counters stay fatal.
+        match = re.match(r'^RX n=([0-9]+)(?:\s|$)', line)
+        if (not allow_malformed or match is None or int(match[1]) < 1
+                or len(re.findall(r'(?:^|\s)n=', line)) != 1):
+            raise
+        return dict(rx_count=int(match[1]), crc_valid=False, state='serial_error',
+                    header_crc=None, rx_done=None, irq=None, buffer_offset=None,
+                    payload_hex='', sequence=None, rssi_dbm=None, snr_db=None,
+                    frequency_error_hz=None, serial_parse_error=f'{type(exc).__name__}: {exc}',
+                    raw=line)
+
+
+def _parse_rx(line):
     f = fields(line)
     payload = bytes.fromhex(f['payload'])
     if len(payload) != int(f['len']):
@@ -51,9 +70,12 @@ def parse_rx(line):
 
 
 def summarize_serial(records, first, packets, final_counter, *, tx_complete, collection_complete,
-                     allow_unrecognized_rx=False):
-    ids, duplicates, foreign, corrupt, crc_fail = set(), 0, 0, 0, 0
+                     allow_unrecognized_rx=False, allow_malformed_rx=False):
+    ids, duplicates, foreign, corrupt, crc_fail, malformed = set(), 0, 0, 0, 0, 0
     for r in records:
+        if r.get('serial_parse_error'):
+            malformed += 1
+            continue
         if not r['crc_valid']:
             crc_fail += 1
             continue
@@ -67,18 +89,22 @@ def summarize_serial(records, first, packets, final_counter, *, tx_complete, col
         if seq in ids: duplicates += 1
         ids.add(seq)
     counters = [r['rx_count'] for r in records]
-    transport_complete = (counters == list(range(1,len(records)+1)) and final_counter == len(records))
+    events_complete = (counters == list(range(1,len(records)+1)) and final_counter == len(records))
+    transport_complete = events_complete and not malformed
     # A known ID with corrupted content is an RF packet error, even if its
     # CRC passed. Preserve the event and count the planned ID as lost.
     # In a controlled conducted delivery test, unknown/empty radio outputs
     # cannot create successful planned IDs. Count them separately while keeping
     # the entire planned denominator. The default still rejects foreign traffic.
-    valid = bool(tx_complete and collection_complete and transport_complete
+    valid = bool(tx_complete and collection_complete and events_complete
+                 and (not malformed or allow_malformed_rx)
                  and (not foreign or allow_unrecognized_rx))
     return {'measurement_valid':valid, 'per':1-len(ids)/packets if valid else None,
             'planned_packets':packets, 'received_unique':len(ids), 'usable_toa':0,
             'lost':packets-len(ids), 'crc_fail':crc_fail, 'duplicates':duplicates,
             'foreign_packets':foreign, 'payload_mismatches':corrupt,
+            'serial_parse_errors':malformed, 'malformed_rx_allowed':allow_malformed_rx,
+            'serial_event_counts_complete':events_complete,
             'unrecognized_rx_allowed':allow_unrecognized_rx,
             'serial_transport_complete':transport_complete, 'tx_complete':tx_complete,
             'collection_complete':collection_complete,
@@ -120,7 +146,7 @@ def measure_serial(c,args,prefix,spp,snr,seed,checkpoint,start_tx,generator_summ
                 if line is not None:
                     log.write(line+'\n'); log.flush()
                     if line.startswith('RX '):
-                        point['records'].append(parse_rx(line))
+                        point['records'].append(parse_rx(line, allow_malformed=getattr(args, 'allow_malformed_rx', False)))
                     if line.startswith(('ERR','FATAL')):
                         raise RuntimeError('receiver: '+line)
                 return line
@@ -173,6 +199,7 @@ def measure_serial(c,args,prefix,spp,snr,seed,checkpoint,start_tx,generator_summ
             point.update(summarize_serial(point['records'],args.first_sequence,args.packets,
                          int(point['final_receiver_profile']['rx_packets']),
                          tx_complete=complete,collection_complete=True,
+                         allow_malformed_rx=getattr(args, 'allow_malformed_rx', False),
                          allow_unrecognized_rx=args.allow_unrecognized_rx))
             point['status']='complete' if point['measurement_valid'] else 'invalid'
         point['raw_trace']=raw.name
