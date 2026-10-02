@@ -7,7 +7,8 @@
 //   RX n=<count> state=<0|crc|other> len=<bytes> rssi=<dBm> snr=<dB>
 //      ferr=<Hz> payload=<hex>
 //
-// state=0 is a valid packet (header and payload CRC), state=crc a payload CRC
+// state=0 is RadioLib readData success; the host still validates the complete
+// planned payload and the reported header CRC/RX_DONE metadata. state=crc is a CRC
 // mismatch (RadioLib -7). The RF switch (DIO5/DIO6) is driven by the LR1121
 // from the same table as the transmitter firmware (RX: DIO5 high); `set boost
 // on|off` selects the boosted receive gain explicitly, so a curve names it.
@@ -24,7 +25,7 @@
 
 namespace {
 
-constexpr char kFirmwareVersion[] = "0.2.0";
+constexpr char kFirmwareVersion[] = "0.2.1";
 constexpr size_t kMaxPacket = 255;
 constexpr uint32_t kRadioPowerUpDelayMs = 1500;
 
@@ -164,16 +165,24 @@ void serviceSerial() {
 void servicePacket() {
   if (!packetFlag) return;
   packetFlag = false;
-  uint8_t data[kMaxPacket];
-  const size_t length = radio.getPacketLength();
+  uint8_t data[kMaxPacket] = {};
+  const uint32_t irq = radio.getIrqStatus();
+  uint8_t bufferOffset = 0;
+  const size_t length = radio.getPacketLength(true, &bufferOffset);
+  bool headerCrc = false;
+  const int16_t headerState = radio.getLoRaRxHeaderInfo(nullptr, &headerCrc);
   const int16_t state = radio.readData(data, length);
   ++packetCount;
   const char* stateName = state == RADIOLIB_ERR_NONE ? "0"
                           : state == RADIOLIB_ERR_CRC_MISMATCH ? "crc" : "other";
-  Serial.printf("RX n=%lu state=%s code=%d len=%u rssi=%.1f snr=%.2f ferr=%.1f payload=",
+  Serial.printf("RX n=%lu state=%s code=%d len=%u rssi=%.1f snr=%.2f ferr=%.1f "
+                "irq=0x%08lx rx_done=%u header_crc=%s header_code=%d buffer_offset=%u payload=",
                 static_cast<unsigned long>(packetCount), stateName, state,
                 static_cast<unsigned>(length), radio.getRSSI(), radio.getSNR(),
-                0.0F);
+                0.0F, static_cast<unsigned long>(irq),
+                (irq & RADIOLIB_LR11X0_IRQ_RX_DONE) ? 1U : 0U,
+                headerState == RADIOLIB_ERR_NONE ? (headerCrc ? "on" : "off") : "unknown",
+                headerState, bufferOffset);
   for (size_t i = 0; i < length && i < kMaxPacket; ++i) Serial.printf("%02x", data[i]);
   Serial.println();
   board::setLed(true);

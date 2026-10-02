@@ -57,10 +57,34 @@ is a packet error, not a successful reception or an acquisition failure.
 Its timestamp is excluded from ToA repeatability. PL summaries made from
 older parsed records without payload bytes must be regenerated from raw traces.
 
+By default, a CRC/readData-success output without a recognizable planned ID
+invalidates the point as foreign traffic. A controlled conducted delivery test
+may explicitly select `--allow-unrecognized-rx`: unknown or empty outputs are
+retained and counted separately, while only exact planned payloads add successes.
+This measures delivered-packet PER, including receiver firmware/buffer failures;
+it does not identify an unknown output as unrelated traffic or as an RF error.
+Final counter continuity, complete finite TX and exact payload checks remain
+mandatory. State the selected policy with the results; do not use the option
+to qualify uncontrolled over-the-air sensitivity trials.
+
+LR1121 RX firmware 0.2.1 also records IRQ, RX_DONE, RX buffer offset and the
+CRC-presence flag read from the last explicit header before clearing its buffer.
+If this metadata is present, the host requires RX_DONE, a successful header
+query and CRC enabled in addition to readData success. Older logs retain their
+legacy parsing and cannot retroactively prove the missing metadata. RadioLib
+readData success alone does not establish a correct delivered payload.
+
 Long SF12 waveforms need small batches: templates are uploaded to the board's
 RAM filesystem. The harness checks batch size and available space before TX.
 Use distinct `--first-sequence` ranges and preserve each finite batch before
 aggregating counts. Do not average batches with unequal denominators.
+For repeated SNR points of one batch, `--template-cache-dir
+/tmp/lora-finite-cache-<32 hex digits>` may retain one owned template between
+invocations. Every reuse verifies its SHA-256 against the host template; a
+mismatch retires only that cache file and forces a verified upload. A matching
+template is hard-linked to the finite run and needs no second RAM-sized copy.
+The caller retires the cache file and its directory after the campaign. Per-run
+source snapshots, TX seeds, generator summaries and counters are still retained.
 Report binomial uncertainty: zero losses in N trials has a one-sided 95%
 upper bound `1 - 0.05**(1/N)`, approximately 3/N.
 
