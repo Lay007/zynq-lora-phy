@@ -112,6 +112,12 @@ static int trace_wait_expired(struct trace_wait *wait, uint64_t now,
   return now - wait->last_progress_ms > timeout_ms;
 }
 
+static int trace_timeout_needs_rearm(uint32_t status) {
+  /* Empty/inactive means it is already armed. Pulsing rearm here creates a
+   * blind interval and can also clear acquisition immediately before capture. */
+  return (status & 0x1ffu) != 0;
+}
+
 int main(int argc, char **argv) {
   long count = argc > 1 ? atol(argv[1]) : 0;
   long timeout_ms = argc > 2 ? atol(argv[2]) : 5000;
@@ -152,10 +158,12 @@ int main(int argc, char **argv) {
   printf("START bridge=LORA control=0x%08x count=%ld timeout_ms=%ld\n", original, count, timeout_ms);
   select_page(0);
   uint32_t last_p0seq = REG(SEQUENCE);
+  int needs_rearm = 1;
 
   for (long got = 0; !stop && (count == 0 || got < count);) {
     if (duration_ms && now_ms() - t0 >= (uint64_t)duration_ms) break;
-    rearm();
+    if (needs_rearm) rearm();
+    needs_rearm = 0;
     select_page(CLOCK_PAGE);
     uint32_t drop_before = REG(METRICS) & 0xffffu;
     select_page(SYMBOL_PAGE);
@@ -182,6 +190,7 @@ int main(int argc, char **argv) {
       printf("TIMEOUT %" PRIu64 " status=0x%08x joint=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u\n",
              now_ms() - t0, status, timeout_joint, timeout_clock, drop_before, timeout_drop);
       ++got; /* a timeout is an attempt too, so a dead receiver cannot hang the run */
+      needs_rearm = trace_timeout_needs_rearm(status);
       continue;
     }
     unsigned captured = status & 0xffu;
@@ -239,6 +248,7 @@ int main(int argc, char **argv) {
            drop_before, drop_after, p0seq != last_p0seq, changed, sf, digits*4u,
            sample_interval_clocks, sample_interval_min_clocks, mac_search_clocks, mac_search_completed, sym);
     last_p0seq = p0seq;
+    needs_rearm = 1;
     ++got;
   }
   REG(CONTROL) = original & ~0x4u;

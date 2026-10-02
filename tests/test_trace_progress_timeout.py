@@ -31,6 +31,10 @@ def test_capture_progress_survives_deadline_and_stalls_still_timeout(tmp_path):
         '  struct trace_wait stalled = {0, 0};\n'
         '  assert(!trace_wait_expired(&stalled, 999, 1000, 0x53590100));\n'
         '  assert(trace_wait_expired(&stalled, 2000, 1000, 0x53590100));\n'
+        '  /* Idle timeout must not pulse reset over a just-starting frame. */\n'
+        '  assert(!trace_timeout_needs_rearm(0x53590000));\n'
+        '  assert(trace_timeout_needs_rearm(0x53590100));\n'
+        '  assert(trace_timeout_needs_rearm(0x53590144));\n'
         '  return 0;\n}\n', encoding="utf-8")
     binary = tmp_path / "timeout"
     subprocess.run([cc, "-O2", "-Wall", "-Wextra", "-Werror",

@@ -37,6 +37,9 @@ stream rate/zero stuffing, as described in `per-curves-experiment.md`.
   from rearm could otherwise clear a partly captured first packet when the
   one-second TX lead-in happens to finish near that deadline. Idle and stalled
   captures still expire; `duration_ms` remains an absolute collection limit.
+  An empty inactive buffer stays armed across timeout reports. Only a stalled
+  partial capture is rearmed after timeout; pulsing rearm on an already armed
+  buffer would create a blind interval at the first frame's acquisition.
 - The generator writes a one-second noise lead, all packets and their gaps, a
   two-second noise tail, then padding to a whole 262144-sample IIO buffer. This
   avoids silently dropping a partial final buffer in libiio 0.25's
