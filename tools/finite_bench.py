@@ -79,9 +79,49 @@ def parse_record(line: str) -> dict:
                                                  and not record['changed'])
         # Integer Q12 retains all 64 coarse bits; do not round them through float.
         record["toa_samples_q12"] = record["p0coarse"] * 4096 + record["p0frac"]
+        attach_packet_latency(record, fields)
     except (ValueError, KeyError, TypeError, IndexError) as exc:
         record.update(kind="invalid", capture_valid=False, error=str(exc))
     return record
+
+
+def attach_packet_latency(record: dict, fields: dict) -> None:
+    """LT1 is optional; its rejection never changes the existing ToA/PER policy."""
+    names = ('lat_status', 'lat_seq', 'lat_detect_clocks', 'lat_down_clocks',
+             'lat_coarse', 'lat_frac', 'lat_changed')
+    if not any(name in fields for name in names):
+        record.update(latency_supported=False, latency_valid=False,
+                      latency_rejection_reasons=['latency_unsupported'])
+        return
+    record.update({name: int(fields[name], 0) for name in names})
+    if (any(not 0 <= record[name] < 2**32 for name in names[:4]) or
+        not 0 <= record['lat_coarse'] < 2**64 or
+        not -(2**31) <= record['lat_frac'] < 2**31 or record['lat_changed'] not in (0, 1)):
+        raise ValueError('invalid packet latency fields')
+    status = record['lat_status']
+    supported = status >> 8 == 0x4c5401
+    record['latency_supported'] = supported
+    reasons = []
+    if not supported:
+        reasons.append('latency_unsupported')
+    else:
+        if record['lat_changed']: reasons.append('latency_snapshot_changed')
+        if (record['lat_seq'] != record['p0seq'] or record['lat_coarse'] != record['p0coarse'] or
+            record['lat_frac'] != record['p0frac']): reasons.append('latency_packet_identity')
+        if not record['toa_valid']: reasons.append('latency_toa_invalid')
+        if not status & 0x80: reasons.append('latency_snapshot_invalid')
+        if status & 0x40: reasons.append('latency_reserved_flags')
+        if status & 0x0c: reasons.append('latency_overflow')
+        if status & 0x10: reasons.append('latency_ambiguous_restart')
+        if not status & 0x20: reasons.append('latency_not_applied')
+        if status & 3 != 3: reasons.append('latency_counter_invalid')
+        if record['lat_down_clocks'] > record['lat_detect_clocks']:
+            reasons.append('latency_counter_order')
+    record['latency_rejection_reasons'] = reasons
+    record['latency_valid'] = not reasons
+    if record['latency_valid']:
+        record['latency_detect_us'] = record['lat_detect_clocks'] / 62.5
+        record['latency_down_us'] = record['lat_down_clocks'] / 62.5
 
 
 def summarize(records: list[dict], first_sequence: int, planned: int,
@@ -102,6 +142,7 @@ def summarize(records: list[dict], first_sequence: int, planned: int,
         matching = [r for r in good if r["seq"] == seq]
         outcomes.append({"seq": seq, "crc_valid": bool(matching),
                          "toa_valid": any(r.get("toa_valid", False) for r in matching),
+                         "latency_valid": any(r.get("latency_valid", False) for r in matching),
                          "capture_ids": [r["cap"] for r in matching]})
     invalid = counts["invalid"] + unvalidated + sum(r.get("kind") == "packet" and not r.get("capture_valid") for r in records)
     valid = bool(tx_complete and collection_complete and not invalid and not unexpected)
@@ -116,4 +157,5 @@ def summarize(records: list[dict], first_sequence: int, planned: int,
             "packet_records": counts["packet"], "timeouts": counts["timeout"],
             "invalid_records": invalid,
             "crc_fail": sum(r.get("kind") == "packet" and not r.get("crc", False) for r in records),
-            "usable_toa": sum(x["toa_valid"] for x in outcomes), "outcomes": outcomes}
+            "usable_toa": sum(x["toa_valid"] for x in outcomes),
+            "usable_latency": sum(x['latency_valid'] for x in outcomes), "outcomes": outcomes}
