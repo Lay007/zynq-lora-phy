@@ -1,5 +1,9 @@
 # Finite PER and timestamp collection
 
+The collector also preserves [optional packet processing latency](packet-latency.md)
+when an experimental FPGA image exposes LT1. Legacy images and traces remain
+supported; the existing busy diagnostic is not a packet latency measurement.
+
 `tools/finite_per_measure.py` is the finite PL bench alternative to the historical
 continuous `per_measure.py` series. It currently supports SF7/BW125 at 1 MS/s,
 CR4/5 through CR4/8, manual RX gain, and gaps of at least 0.15 s. A point sends

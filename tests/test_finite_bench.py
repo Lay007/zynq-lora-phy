@@ -66,6 +66,74 @@ def test_hardware_clock_diagnostics_are_optional_and_lossless(decode):
     assert current['sample_interval_min_clocks'] == 62
 
 
+def latency_line(**overrides):
+    values = dict(lat_status='0x4c5401a3', lat_seq='3', lat_detect_clocks='20552',
+        lat_down_clocks='4745', lat_coarse='0x123456789abcdef0', lat_frac='-123', lat_changed='0')
+    values.update(overrides)
+    return line(**values)
+
+
+def test_packet_latency_is_attributed_without_rounding_the_timestamp(decode):
+    r = bench.parse_record(latency_line())
+    assert r['latency_supported'] and r['latency_valid'] and r['toa_valid']
+    assert r['lat_coarse'] == 0x123456789abcdef0
+    assert r['lat_detect_clocks'] == 20552 and r['lat_down_clocks'] == 4745
+    assert r['latency_detect_us'] == 328.832 and r['latency_down_us'] == 75.92
+    assert r['latency_rejection_reasons'] == []
+
+
+@pytest.mark.parametrize('raw', [line(), latency_line(lat_status='0x00011207')])
+def test_old_image_or_old_trace_has_no_invented_latency(decode, raw):
+    r = bench.parse_record(raw)
+    assert r['kind'] == 'packet' and r['toa_valid'] and r['crc']
+    assert not r['latency_supported'] and not r['latency_valid']
+    assert r['latency_rejection_reasons'] == ['latency_unsupported']
+    assert 'latency_detect_us' not in r
+
+
+@pytest.mark.parametrize('fields,reason', [
+    ({'lat_changed': '1'}, 'latency_snapshot_changed'),
+    ({'lat_seq': '4'}, 'latency_packet_identity'),
+    ({'lat_coarse': '0x123456789abcdef1'}, 'latency_packet_identity'),
+    ({'lat_frac': '-122'}, 'latency_packet_identity'),
+    ({'lat_status': '0x4c540123'}, 'latency_snapshot_invalid'),
+    ({'lat_status': '0x4c5401e3'}, 'latency_reserved_flags'),
+    ({'lat_status': '0x4c5401a6'}, 'latency_overflow'),
+    ({'lat_status': '0x4c5401b0'}, 'latency_ambiguous_restart'),
+    ({'lat_status': '0x4c540183'}, 'latency_not_applied'),
+    ({'lat_status': '0x4c5401a1'}, 'latency_counter_invalid'),
+    ({'lat_down_clocks': '20553'}, 'latency_counter_order')])
+def test_rejected_latency_retains_raw_values_without_changing_toa_or_crc(decode, fields, reason):
+    r = bench.parse_record(latency_line(**fields))
+    assert r['kind'] == 'packet' and r['toa_valid'] and r['crc']
+    assert not r['latency_valid'] and reason in r['latency_rejection_reasons']
+    assert 'lat_detect_clocks' in r and 'latency_detect_us' not in r
+
+
+@pytest.mark.parametrize('fields', [dict(p0fresh='0'), dict(changed='1'), dict(drop_after='3')])
+def test_fresh_latency_cannot_make_invalid_toa_usable(decode, fields):
+    r = bench.parse_record(latency_line(**fields))
+    assert not r['latency_valid'] and 'latency_toa_invalid' in r['latency_rejection_reasons']
+
+
+@pytest.mark.parametrize('raw', [line(lat_status='0x4c5401a3'), latency_line(lat_detect_clocks='-1'),
+    latency_line(lat_down_clocks=str(2**32)), latency_line(lat_changed='2'),
+    latency_line(lat_coarse=str(2**64)), latency_line(lat_frac=str(2**31))])
+def test_malformed_latency_extension_remains_an_invalid_attempt(decode, raw):
+    r = bench.parse_record(raw)
+    assert r['kind'] == 'invalid' and not r['capture_valid'] and r['raw'] == raw
+
+
+def test_latency_summary_requires_the_planned_exact_payload_and_crc():
+    r = packet(12)
+    r['latency_valid'] = True
+    summary = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert summary['received_unique'] == summary['usable_latency'] == 1
+    r['payload_hex'] = '00'
+    summary = bench.summarize([r], 12, 1, tx_complete=True, collection_complete=True)
+    assert summary['received_unique'] == summary['usable_latency'] == 0
+
+
 def test_continuity_batch_never_writes_a_receiver_reset(monkeypatch):
     calls=[]
     monkeypatch.setattr(per_measure, 'run', lambda c, command: calls.append(command) or '0x00001201')

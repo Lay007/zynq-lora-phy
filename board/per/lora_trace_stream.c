@@ -51,12 +51,13 @@
 #define DEBUG 0x588
 #define SIGNATURE 0x5c8
 
-#define PAGE_MASK 0x80f8ffcfu /* keeps capture limit; clears history/profile/page/index bits */
+#define PAGE_MASK 0x80f8ff4fu /* keeps capture limit; clears history/profile/latency/page/index bits */
 #define SYMBOL_PAGE 0x00010000u
 #define JOINT_PAGE 0x00040000u
 #define CLOCK_PAGE 0x00020000u
 #define TRACE_DEPTH 128
 #define PROFILE_PAGE 0x20u
+#define LATENCY_PAGE 0x80u
 #define TRACE_LIMIT_MASK 0x80f80000u
 #define TRACE_LIMIT_ENABLE 0x40u
 
@@ -238,15 +239,30 @@ int main(int argc, char **argv) {
     uint32_t sample_interval_min_clocks = REG(SAMPLE_LO);
     uint32_t mac_search_completed = REG(SAMPLE_HI);
     uint32_t drop_after = REG(METRICS) & 0xffffu;
+    /* LT1 has the same held payload/sequence as page 0. Old images return
+     * another page here; preserve its status so the host reports unsupported. */
+    select_page(LATENCY_PAGE);
+    uint32_t lat_status = REG(STATUS);
+    uint32_t lat_seq = REG(SEQUENCE);
+    uint32_t lat_detect_clocks = REG(SYMBOL);
+    uint32_t lat_down_clocks = REG(SAMPLE_LO);
+    uint32_t lat_lo = REG(SAMPLE_HI);
+    uint32_t lat_hi = REG(METRICS);
+    int32_t lat_frac = (int32_t)REG(DEBUG);
+    int lat_changed = lat_seq != REG(SEQUENCE) || lat_status != REG(STATUS);
+    if ((lat_status >> 8) == 0x4c5401u &&
+        (lat_seq != p0seq || lat_lo != p0lo || lat_hi != p0hi || lat_frac != p0frac))
+      lat_changed = 1;
     select_page(0);
     if (p0seq != REG(SEQUENCE)) changed = 1;
     printf("PKT %" PRIu64 " cap=%u pbin=%u realigned=%u n=%u p0seq=%u p0coarse=0x%08x%08x "
-           "p0frac=%d p0status=0x%08x p0log=%d p0debug=0x%08x joint=0x%08x joint_correction=%d joint_up_offset=%d joint_up_coarse=%u joint_packet_start=%u joint_phase_bin=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u p0fresh=%d changed=%d sf=%u sym_bits=%u sample_interval_clocks=%u sample_interval_min_clocks=%u mac_search_clocks=%u mac_search_completed=%u sym=%s\n",
+           "p0frac=%d p0status=0x%08x p0log=%d p0debug=0x%08x joint=0x%08x joint_correction=%d joint_up_offset=%d joint_up_coarse=%u joint_packet_start=%u joint_phase_bin=0x%08x clock_status=0x%08x drop_before=%u drop_after=%u p0fresh=%d changed=%d sf=%u sym_bits=%u sample_interval_clocks=%u sample_interval_min_clocks=%u mac_search_clocks=%u mac_search_completed=%u lat_status=0x%08x lat_seq=%u lat_detect_clocks=%u lat_down_clocks=%u lat_coarse=0x%08x%08x lat_frac=%d lat_changed=%d sym=%s\n",
            now_ms() - t0, sequence, debug >> 16, (debug >> 8) & 1u, captured, p0seq,
            p0hi, p0lo, p0frac, p0status, (int32_t)p0log, p0debug, joint,
            joint_correction, joint_up_offset, joint_up_coarse, joint_packet_start, joint_phase_bin, clock_status,
            drop_before, drop_after, p0seq != last_p0seq, changed, sf, digits*4u,
-           sample_interval_clocks, sample_interval_min_clocks, mac_search_clocks, mac_search_completed, sym);
+           sample_interval_clocks, sample_interval_min_clocks, mac_search_clocks, mac_search_completed,
+           lat_status, lat_seq, lat_detect_clocks, lat_down_clocks, lat_hi, lat_lo, lat_frac, lat_changed, sym);
     last_p0seq = p0seq;
     needs_rearm = 1;
     ++got;
