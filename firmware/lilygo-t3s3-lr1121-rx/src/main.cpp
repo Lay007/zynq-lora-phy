@@ -25,7 +25,7 @@
 
 namespace {
 
-constexpr char kFirmwareVersion[] = "0.2.1";
+constexpr char kFirmwareVersion[] = "0.2.3";
 constexpr size_t kMaxPacket = 255;
 constexpr uint32_t kRadioPowerUpDelayMs = 1500;
 
@@ -43,6 +43,11 @@ struct Profile {
 class LilygoLR1121 : public LR1121 {
  public:
   explicit LilygoLR1121(Module* module) : LR1121(module) { chipType = board::kRadioDeviceId; }
+  int16_t getBaseVersion(LR11x0VersionInfo_t* info) {
+    // Some boards expose device ID 0xF3. getVersionInfo() then also queries
+    // unsupported WiFi/GNSS commands. This diagnostic needs only base version.
+    return getVersion(&info->hardware, &info->device, &info->fwMajor, &info->fwMinor);
+  }
 };
 
 LilygoLR1121 radio(new Module(board::kRadioCs, board::kRadioDio9, board::kRadioReset,
@@ -60,6 +65,10 @@ Profile profile;
 volatile bool packetFlag = false;
 bool receiving = false;
 uint32_t packetCount = 0;
+bool emptyRecovery = false;
+uint32_t emptyRecoveries = 0;
+LR11x0VersionInfo_t radioVersion = {};
+int16_t radioVersionState = RADIOLIB_ERR_UNKNOWN;
 String serialLine;
 
 #if defined(ESP8266) || defined(ESP32)
@@ -89,13 +98,31 @@ bool apply(const Profile& p) {
 void printProfile() {
   Serial.printf(
       "PROFILE freq_mhz=%.3f bw_khz=%.1f sf=%u cr=4/%u sync=0x%02X preamble=%u "
-      "crc=%s boost=%s receiving=%s chip=lr1121 firmware=%s ldro=%s rx_packets=%lu\n",
+      "crc=%s boost=%s receiving=%s chip=lr1121 firmware=%s ldro=%s rx_packets=%lu "
+      "empty_recovery=%s empty_recoveries=%lu radio_version_code=%d "
+      "radio_hw=0x%02X radio_device=0x%02X radio_fw=%u.%u\n",
       profile.frequencyMhz, profile.bandwidthKhz, profile.spreadingFactor,
       profile.codingRate, profile.syncWord, profile.preambleSymbols,
       profile.crcEnabled ? "on" : "off", profile.boostedGain ? "on" : "off",
       receiving ? "yes" : "no", kFirmwareVersion,
       (uint32_t(1) << profile.spreadingFactor) / profile.bandwidthKhz > 16.0F ? "on" : "off",
-      static_cast<unsigned long>(packetCount));
+      static_cast<unsigned long>(packetCount), emptyRecovery ? "on" : "off",
+      static_cast<unsigned long>(emptyRecoveries), radioVersionState,
+      radioVersion.hardware, radioVersion.device, radioVersion.fwMajor, radioVersion.fwMinor);
+}
+
+bool initializeRadio() {
+  receiving = false;
+  packetFlag = false;
+  const int16_t begin = radio.begin(profile.frequencyMhz, profile.bandwidthKhz,
+                                   profile.spreadingFactor, profile.codingRate,
+                                   profile.syncWord, 0, profile.preambleSymbols, 3.0F);
+  radio.setRfSwitchTable(kRfSwitchPins, kRfSwitchTable);
+  if (!ok(begin, "begin") || !apply(profile)) return false;
+  radioVersion = {};
+  radioVersionState = radio.getBaseVersion(&radioVersion);
+  radio.setPacketReceivedAction(onPacket);
+  return true;
 }
 
 void startReceiving() {
@@ -107,6 +134,7 @@ void printHelp() {
   Serial.println("commands: help | show | version | rx start | rx stop | reset count");
   Serial.println("  set freq <MHz> | set bw <kHz> | set sf <5..12> | set cr <5..8>");
   Serial.println("  set sync <byte> | set preamble <n> | set crc <on|off> | set boost <on|off>");
+  Serial.println("  set empty_recovery <on|off> | reset radio");
 }
 
 void handle(String line) {
@@ -119,12 +147,27 @@ void handle(String line) {
   if (cmd == "version") { Serial.printf("zynq-lora-lilygo-lr1121-rx %s\n", kFirmwareVersion); return; }
   if (cmd == "rx start") { startReceiving(); Serial.println(receiving ? "OK receiving" : "ERR not receiving"); return; }
   if (cmd == "rx stop") { radio.standby(); receiving = false; Serial.println("OK stopped"); return; }
-  if (cmd == "reset count") { packetCount = 0; Serial.println("OK count=0"); return; }
+  if (cmd == "reset count") { packetCount = 0; emptyRecoveries = 0; Serial.println("OK count=0"); return; }
+  if (cmd == "reset radio") {
+    const bool wasReceiving = receiving;
+    const bool ready = initializeRadio();
+    if (ready && wasReceiving) startReceiving();
+    Serial.println(ready ? "OK radio reset" : "ERR radio reset");
+    printProfile();
+    return;
+  }
   if (cmd.startsWith("set ")) {
     const int space = cmd.indexOf(' ', 4);
     if (space < 0) { Serial.println("ERR usage: set <name> <value>"); return; }
     const String name = cmd.substring(4, space);
     const String value = cmd.substring(space + 1);
+    if (name == "empty_recovery") {
+      if (value != "on" && value != "off") { Serial.println("ERR value must be on or off"); return; }
+      emptyRecovery = value == "on";
+      Serial.println("OK");
+      printProfile();
+      return;
+    }
     Profile next = profile;
     if (name == "freq") next.frequencyMhz = value.toFloat();
     else if (name == "bw") next.bandwidthKhz = value.toFloat();
@@ -188,6 +231,17 @@ void servicePacket() {
   board::setLed(true);
   delay(5);
   board::setLed(false);
+  // Preserve the empty output above. Never repair a shifted payload or count it
+  // as a successful packet. A zero-length reception preceded persistent buffer
+  // shifts on the bench; reinitialization restores the exact selected profile.
+  // Recovery creates a receive gap, which remains part of measured packet loss.
+  if (length == 0 && emptyRecovery) {
+    ++emptyRecoveries;
+    const bool ready = initializeRadio();
+    Serial.printf("RECOVERY reason=empty_rx count=%lu ready=%u\n",
+                  static_cast<unsigned long>(emptyRecoveries), ready ? 1U : 0U);
+    if (!ready) { printProfile(); return; }
+  }
   startReceiving();
 }
 
@@ -205,15 +259,10 @@ void setup() {
   delay(kRadioPowerUpDelayMs);
 
   Serial.printf("Initializing LILYGO T3-S3 LR1121 receiver firmware %s\n", kFirmwareVersion);
-  const int16_t begin = radio.begin(profile.frequencyMhz, profile.bandwidthKhz,
-                                    profile.spreadingFactor, profile.codingRate,
-                                    profile.syncWord, 0, profile.preambleSymbols, 3.0F);
-  radio.setRfSwitchTable(kRfSwitchPins, kRfSwitchTable);
-  if (!ok(begin, "begin") || !apply(profile)) {
+  if (!initializeRadio()) {
     Serial.println("FATAL radio initialization failed");
     while (true) { board::setLed(true); delay(100); board::setLed(false); delay(900); }
   }
-  radio.setPacketReceivedAction(onPacket);
   Serial.println("READY receiver stopped; type 'rx start'");
   printProfile();
 }
