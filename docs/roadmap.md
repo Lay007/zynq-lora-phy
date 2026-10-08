@@ -90,7 +90,7 @@ metric definitions, and the explicit configuration-aided boundary.
   record. `run_timestamp_metadata_regression` covers both arrival orders,
   same-cycle arrival, reset, duplicate-fragment overflow and record preservation.
   The focused regression passed in
-  [CI run 32837815018](https://github.com/Lay007/zynq-lora-phy-positioning/actions/runs/32837815018)
+  [CI run 32837815018](https://github.com/Lay007/zynq-lora-phy/actions/runs/32837815018)
   and uploaded its CSV evidence.
 
 Acceptance: complete. Simulink matches MATLAB within documented tolerances for

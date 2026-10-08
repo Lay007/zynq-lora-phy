@@ -157,8 +157,8 @@ cmake --build build/cpp --parallel
 sudo apt update
 sudo apt install -y build-essential cmake
 
-git clone https://github.com/Lay007/zynq-lora-phy-positioning.git
-cd zynq-lora-phy-positioning
+git clone https://github.com/Lay007/zynq-lora-phy.git
+cd zynq-lora-phy
 git checkout lora_cpp
 
 cd cpp
