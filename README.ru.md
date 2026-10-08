@@ -1,4 +1,4 @@
-# Zynq LoRa PHY и позиционирование
+# Zynq LoRa PHY
 
 [English version](README.md)
 
