@@ -1,0 +1,220 @@
+name: RTL CI
+
+on:
+  push:
+    branches: [main, lora_cpp]
+    paths:
+      - "fpga/**"
+      - "src/**"
+      - "tools/joint_packet_regression.py"
+      - "pyproject.toml"
+      - ".github/workflows/rtl-ci.yml"
+  pull_request:
+    paths:
+      - "fpga/**"
+      - "src/**"
+      - "tools/joint_packet_regression.py"
+      - "pyproject.toml"
+      - ".github/workflows/rtl-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lora-rtl-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rtl-wrapper-smoke:
+    name: RTL integration wrapper smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Check accelerated MAC, sparse refinement, prefetch and signal presence
+        run: |
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=17 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=17 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1024 -Ptb_lora_mac_response_pipeline.FAST=0 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_mac_response_pipeline -Ptb_lora_mac_response_pipeline.N=1024 -Ptb_lora_mac_response_pipeline.FAST=1 -o /tmp/mac-pipeline fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_mac_response_pipeline.sv
+          vvp /tmp/mac-pipeline
+          iverilog -g2012 -s tb_lora_search_stride -o /tmp/search-stride fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/tb/tb_lora_search_stride.sv
+          vvp /tmp/search-stride
+          iverilog -g2012 -s tb_lora_joint_prefetch -o /tmp/joint-prefetch fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/tb/tb_lora_joint_prefetch.sv
+          vvp /tmp/joint-prefetch
+          iverilog -g2012 -DLORA_NAMESPACED_GENERATED -s tb_lora_preamble_timestamp_presence -o /tmp/presence fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/tb/tb_lora_preamble_timestamp_presence.sv
+          vvp /tmp/presence
+      - name: Compile and run PL sample counter testbench
+        run: |
+          iverilog -g2012 -o /tmp/lora_sample_counter_capture_tb fpga/wrappers/lora_sample_counter_capture.v fpga/tb/tb_lora_sample_counter_capture.sv
+          vvp /tmp/lora_sample_counter_capture_tb
+      - name: Compile and run IQ history buffer testbench
+        run: |
+          iverilog -g2012 -Wall -o /tmp/lora_iq_history_buffer_tb fpga/wrappers/lora_iq_history_buffer.v fpga/tb/tb_lora_iq_history_buffer.sv
+          vvp /tmp/lora_iq_history_buffer_tb
+      - name: Compile and run iterative matched-filter MAC testbench
+        run: |
+          iverilog -g2012 -Wall -o /tmp/lora_matched_filter_mac_tb fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_matched_filter_mac.v fpga/tb/tb_lora_matched_filter_mac.sv
+          vvp /tmp/lora_matched_filter_mac_tb
+      - name: Compile and run matched-filter search sequencer testbench
+        run: |
+          iverilog -g2012 -Wall -o /tmp/lora_matched_filter_search_tb fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/tb/tb_lora_matched_filter_search.sv
+          vvp /tmp/lora_matched_filter_search_tb
+      - name: Compile and run full-size SF7/L8 matched-filter golden regression
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_matched_filter_search_sf7_l8 -o /tmp/lora_matched_filter_search_sf7_l8_tb fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/tb/tb_lora_matched_filter_search_sf7_l8.sv
+          vvp /tmp/lora_matched_filter_search_sf7_l8_tb
+      - name: Compile and run ToA peak triplet capture testbench
+        run: |
+          iverilog -g2012 -Wall -o /tmp/lora_peak_triplet_capture_tb fpga/wrappers/lora_peak_triplet_capture.v fpga/tb/tb_lora_peak_triplet_capture.sv
+          vvp /tmp/lora_peak_triplet_capture_tb
+      - name: Compile and run detector timestamp aligner testbench
+        run: |
+          iverilog -g2012 -o /tmp/lora_detector_timestamp_align_tb fpga/wrappers/lora_detector_timestamp_align.v fpga/tb/tb_lora_detector_timestamp_align.sv
+          vvp /tmp/lora_detector_timestamp_align_tb
+      - name: Compile and run generated detector timestamp path testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -o /tmp/lora_detector_timestamp_path_tb fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/tb/tb_lora_detector_timestamp_path.sv
+          vvp /tmp/lora_detector_timestamp_path_tb
+      - name: Compile and run IQ to packet timestamp testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_fft_detector_timestamp_path -o /tmp/lora_fft_detector_timestamp_path_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/tb/tb_lora_fft_detector_timestamp_path.sv
+          vvp /tmp/lora_fft_detector_timestamp_path_tb
+      - name: Compile and run IQ to AXI packet timestamp testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_packet_timestamp_axi_path -o /tmp/lora_packet_timestamp_axi_path_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_timestamp_axi_path.v fpga/tb/tb_lora_packet_timestamp_axi_path.sv
+          vvp /tmp/lora_packet_timestamp_axi_path_tb
+      - name: Compile and run automatic packet-rate ToA receiver testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_packet_toa_receiver_top -o /tmp/lora_packet_toa_receiver_top_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/wrappers/lora_symbol_grid_resync.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_toa_receiver_top.v fpga/tb/tb_lora_packet_toa_receiver_top.sv
+          vvp /tmp/lora_packet_toa_receiver_top_tb
+      - name: Compile and run zero-triplet recovery through receiver and generated interpolator
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_invalid_triplet_recovery -o /tmp/lora_invalid_triplet_recovery_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/wrappers/lora_symbol_grid_resync.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_toa_receiver_top.v fpga/tb/tb_lora_invalid_triplet_recovery.sv
+          vvp /tmp/lora_invalid_triplet_recovery_tb
+      - name: Compile and run symbol grid resync testbench
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_symbol_grid_resync -o /tmp/lora_symbol_grid_resync_tb fpga/wrappers/lora_symbol_grid_resync.v fpga/tb/tb_lora_symbol_grid_resync.sv
+          vvp /tmp/lora_symbol_grid_resync_tb
+      - name: Compile and run CFO derotator testbench
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_cfo_derotator -o /tmp/lora_cfo_derotator_tb fpga/wrappers/lora_cfo_derotator.v fpga/tb/tb_lora_cfo_derotator.sv
+          vvp /tmp/lora_cfo_derotator_tb
+      - name: Verify wideband CFO scaling and capture limits
+        run: |
+          for sf in 5 6 7 8 9 10 11 12; do
+            iverilog -g2012 -s tb_lora_cfo_derotator -Ptb_lora_cfo_derotator.SF=$sf -Ptb_lora_cfo_derotator.SPC=2 -o /tmp/wideband_cfo_tb fpga/wrappers/lora_cfo_derotator.v fpga/tb/tb_lora_cfo_derotator.sv
+            vvp /tmp/wideband_cfo_tb
+          done
+          iverilog -g2012 -s tb_lora_symbol_trace_limit -o /tmp/trace_limit_tb fpga/board/clg400/lora_symbol_trace_buffer.v fpga/tb/tb_lora_symbol_trace_limit.sv
+          vvp /tmp/trace_limit_tb
+      - name: Compile and run joint chirp grid controller testbench
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_joint_chirp_grid_controller -o /tmp/lora_joint_chirp_grid_controller_tb fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/tb/tb_lora_joint_chirp_grid_controller.sv
+          vvp /tmp/lora_joint_chirp_grid_controller_tb
+      - name: Compile and run joint chirp grid path timing testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_joint_chirp_grid_path -o /tmp/lora_joint_chirp_grid_path_tb fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/tb/tb_lora_joint_chirp_grid_path.sv
+          vvp /tmp/lora_joint_chirp_grid_path_tb
+          vvp /tmp/lora_joint_chirp_grid_path_tb +chips_to_boundary=1
+          vvp /tmp/lora_joint_chirp_grid_path_tb +chips_to_boundary=2
+      - name: Compile and run asynchronous sample FIFO testbench
+        run: |
+          iverilog -g2012 -Wall -s tb_lora_async_sample_fifo -o /tmp/lora_async_sample_fifo_tb fpga/wrappers/lora_async_sample_fifo.v fpga/tb/tb_lora_async_sample_fifo.sv
+          vvp /tmp/lora_async_sample_fifo_tb
+      - name: Compile and run CLG400 metadata CDC bridge testbench
+        run: |
+          iverilog -g2012 -Wall -DLORA_NAMESPACED_GENERATED -s tb_lora_clg400_gpreg_bridge -o /tmp/lora_clg400_gpreg_bridge_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/wrappers/lora_symbol_grid_resync.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_toa_receiver_top.v fpga/wrappers/lora_async_sample_fifo.v fpga/board/clg400/lora_symbol_trace_buffer.v fpga/board/clg400/lora_decision_history_buffer.v fpga/board/clg400/lora_clg400_gpreg_bridge.v fpga/tb/tb_lora_clg400_gpreg_bridge.sv
+          vvp /tmp/lora_clg400_gpreg_bridge_tb
+      - name: Compile and run timestamp metadata joiner testbench
+        run: |
+          iverilog -g2012 -o /tmp/timestamp_metadata_join_tb fpga/wrappers/lora_timestamp_metadata_join.v fpga/tb/tb_lora_timestamp_metadata_join.sv
+          vvp /tmp/timestamp_metadata_join_tb
+      - name: Compile and run AXI-Lite status register testbench
+        run: |
+          iverilog -g2012 -o /tmp/lora_axi_lite_status_tb fpga/wrappers/lora_axi_lite_status.v fpga/tb/tb_lora_axi_lite_status.sv
+          vvp /tmp/lora_axi_lite_status_tb
+      - name: Compile and run receiver control wrapper integration testbench
+        run: |
+          iverilog -g2012 -o /tmp/lora_receiver_control_wrapper_tb fpga/wrappers/lora_sample_counter_capture.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_receiver_control_wrapper.v fpga/tb/tb_lora_receiver_control_wrapper.sv
+          vvp /tmp/lora_receiver_control_wrapper_tb
+
+  joint-grid-completion:
+    name: Joint grid completion (grid_phase ${{ matrix.grid_phase }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        grid_phase: [0, 296, 512, 700, 1023]
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Compile joint grid completion testbench
+        run: |
+          iverilog -g2012 -DLORA_NAMESPACED_GENERATED -s tb_lora_joint_grid_completion -o /tmp/lora_joint_grid_completion_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/wrappers/lora_symbol_grid_resync.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_toa_receiver_top.v fpga/tb/tb_lora_joint_grid_completion.sv
+      - name: Run joint grid completion at grid_phase ${{ matrix.grid_phase }}
+        run: vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }}
+      - name: Run joint grid completion with carrier offset of both signs
+        run: |
+          vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }} +cfo_nano=418000
+          vvp /tmp/lora_joint_grid_completion_tb +grid_phase=${{ matrix.grid_phase }} +cfo_nano=-418000
+
+  joint-grid-multi-packet:
+    name: Joint grid multi-packet continuity (no reset_in between packets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Compile and run joint grid multi-packet testbench
+        run: |
+          iverilog -g2012 -DLORA_NAMESPACED_GENERATED -s tb_lora_joint_grid_multi_packet -o /tmp/lora_joint_grid_multi_packet_tb fpga/generated/fft-correlator-fixed/lora_fft_correlator_gen/*.v fpga/generated/blind-detector/lora_blind_detector_gen/lora_blind_BlindDetector.v fpga/generated/toa-interpolator/lora_toa_interpolator_gen/lora_toa_ToaInterpolator.v fpga/wrappers/fft_correlator_route_top.v fpga/wrappers/lora_detector_timestamp_align.v fpga/wrappers/lora_detector_timestamp_path.v fpga/wrappers/lora_cfo_derotator.v fpga/wrappers/lora_fft_detector_timestamp_path.v fpga/wrappers/lora_iq_history_buffer.v fpga/wrappers/lora_reference_chirp_rom.v fpga/wrappers/lora_matched_filter_mac.v fpga/wrappers/lora_peak_triplet_capture.v fpga/wrappers/lora_matched_filter_search.v fpga/wrappers/lora_joint_chirp_grid_controller.v fpga/wrappers/lora_symbol_grid_resync.v fpga/wrappers/lora_timestamp_metadata_join.v fpga/wrappers/lora_axi_lite_status.v fpga/wrappers/lora_packet_toa_receiver_top.v fpga/tb/tb_lora_joint_grid_multi_packet.sv
+          vvp /tmp/lora_joint_grid_multi_packet_tb
+
+  joint-full-packet:
+    name: Joint ToA/CFO full packet and deadline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install Verilator and decoder dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+          python -m pip install -e ".[dev]"
+      - name: Decode full packets and verify ToA and header deadline
+        run: python tools/joint_packet_regression.py --out build/joint-full-packet
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: joint-full-packet
+          path: |
+            build/joint-full-packet/*.json
+            build/joint-full-packet/*.log
+          if-no-files-found: warn
+          retention-days: 14
