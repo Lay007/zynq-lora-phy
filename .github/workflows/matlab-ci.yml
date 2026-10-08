@@ -1,0 +1,50 @@
+name: MATLAB CI
+
+on:
+  push:
+    branches: [main, lora_cpp]
+    paths:
+      - "model/matlab/**"
+      - "model/simulink/**"
+      - ".github/workflows/matlab-ci.yml"
+  pull_request:
+    paths:
+      - "model/matlab/**"
+      - "model/simulink/**"
+      - ".github/workflows/matlab-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lora-matlab-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matlab:
+    name: Authoritative MATLAB and Simulink tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up MATLAB and Simulink
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2025a
+          products: Simulink
+      - name: Run floating-point model regression suite
+        uses: matlab-actions/run-command@v3
+        with:
+          command: cd('model/matlab'); results = run_tests; assertSuccess(results);
+      - name: Run timestamp metadata regression
+        uses: matlab-actions/run-command@v3
+        with:
+          command: cd('model/simulink'); report = run_timestamp_metadata_regression(WriteCsv=true, Verbose=true); assert(report.passed);
+      - name: Upload timestamp metadata evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: timestamp-metadata-regression
+          path: docs/data/simulink-m2-timestamp-metadata.csv
+          if-no-files-found: error
