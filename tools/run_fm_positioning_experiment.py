@@ -7,7 +7,7 @@ import argparse
 import csv
 import json
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -470,7 +470,7 @@ def run_experiment(
 
     report: dict[str, Any] = {
         "schema_version": 1,
-        "generated_utc": datetime.now(UTC).isoformat(),
+        "generated_utc": datetime.now(timezone.utc).isoformat(),
         "generator": "tools/run_fm_positioning_experiment.py",
         "git": provenance,
         "configuration": {
