@@ -42,6 +42,19 @@ MATLAB inspection report. See the
 Do not edit raw results after acquisition. If processing changes, create a new
 analysis output that points to the same immutable source capture.
 
+## FM positioning waveform simulation
+
+The self-contained floating-point comparison of equal-duration,
+equal-bandwidth, equal-energy LFM, NLFM, and optimized FM laws is run with:
+
+```powershell
+python tools/run_fm_positioning_experiment.py `
+  --output artifacts/fm-positioning
+```
+
+The committed methodology and reference results are in
+[`docs/fm-positioning-waveform-experiment.md`](../docs/fm-positioning-waveform-experiment.md).
+
 ## Hardware mode sweeps
 
 The repository contains matching 27-mode matrices for both reference

@@ -16,6 +16,7 @@ This directory contains the engineering documentation for the LoRa PHY and posit
 ## Measurement and verification
 
 - [BER methodology](ber-methodology.md)
+- [FM waveform shape for positioning](fm-positioning-waveform-experiment.md)
 - [Stage-by-stage receive-chain differential](stage-differential.md)
 - [IQ capture guide](iq-capture-guide.md)
 - [Automated PHY experiment](automated-phy-experiment.md)
