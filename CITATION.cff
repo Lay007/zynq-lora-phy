@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: "Lyubko"
     given-names: "Alexander"
-repository-code: "https://github.com/Lay007/zynq-lora-phy-positioning"
+repository-code: "https://github.com/Lay007/zynq-lora-phy"
 license: Apache-2.0
 keywords:
   - LoRa

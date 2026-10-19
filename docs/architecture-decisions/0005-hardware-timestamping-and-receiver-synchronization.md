@@ -27,7 +27,7 @@ project ownership, reproducibility and upstream tracking less clear.
 
 ## Decision
 
-`Lay007/zynq-lora-phy-positioning` is authoritative for:
+`Lay007/zynq-lora-phy` is authoritative for:
 
 - the 64-bit valid-sample timebase;
 - PPS epoch synchronization;

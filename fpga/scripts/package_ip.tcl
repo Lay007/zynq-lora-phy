@@ -80,7 +80,7 @@ set_property display_name $displayName $core
 set_property description  $description $core
 set_property vendor_display_name "Zynq LoRa PHY and Positioning" $core
 set_property company_url \
-    "https://github.com/Lay007/zynq-lora-phy-positioning" $core
+    "https://github.com/Lay007/zynq-lora-phy" $core
 set_property supported_families {zynq Production} $core
 
 # The core is generated, so record where from. Without this an unpacked IP

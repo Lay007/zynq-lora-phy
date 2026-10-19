@@ -509,7 +509,7 @@ The atomic coarse/fractional metadata join is covered separately by
 arrival, reset of a partial record, duplicate-fragment overflow and preservation
 of the original fragment all pass. The focused regression and CSV artifact were
 recorded by
-[CI run 32837815018](https://github.com/Lay007/zynq-lora-phy-positioning/actions/runs/32837815018).
+[CI run 32837815018](https://github.com/Lay007/zynq-lora-phy/actions/runs/32837815018).
 
 ## Acquisition: preamble and sync-word acceptance
 

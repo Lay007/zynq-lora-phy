@@ -1,7 +1,7 @@
 # ToA/TDoA qualification gates / Критерии квалификации
 
-Snapshot: 2026-09-24. Tracks [#28](https://github.com/Lay007/zynq-lora-phy-positioning/issues/28)
-and [#29](https://github.com/Lay007/zynq-lora-phy-positioning/issues/29); both remain open.
+Snapshot: 2026-09-24. Tracks [#28](https://github.com/Lay007/zynq-lora-phy/issues/28)
+and [#29](https://github.com/Lay007/zynq-lora-phy/issues/29); both remain open.
 First drafted in PR #30 at the M6 step; rewritten here against the evidence since.
 
 **Naming.** The roadmap's milestones (M4 symbol receiver, M5 single-receiver
