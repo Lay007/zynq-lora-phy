@@ -86,6 +86,20 @@ query and CRC enabled in addition to readData success. Older logs retain their
 legacy parsing and cannot retroactively prove the missing metadata. RadioLib
 readData success alone does not establish a correct delivered payload.
 
+LR1121 RX firmware 0.2.3 records the internal radio hardware/device/base firmware
+version and supports `set empty_recovery on|off` (default off). It queries only
+the base version, avoiding unsupported WiFi/GNSS queries on device ID 0xF3.
+After reporting
+a zero-length reception unchanged, recovery reinitializes the radio, restores
+the selected profile and RF switch, then restarts reception. `RECOVERY` lines
+and the `empty_recoveries` profile counter identify these receive gaps. Counter
+reset clears the packet/recovery counts; `reset radio` preserves them and the
+profile. If reinitialization fails, reception remains stopped and reports an
+error. This is a configurable recovery hypothesis for persistent buffer shifts,
+not proof of their chip-level cause. Include recovery-induced losses in the
+planned transmission denominator, and keep on/off trials separate. The receiver
+never shifts payload bytes to manufacture a matching packet.
+
 Long SF12 waveforms need small batches: templates are uploaded to the board's
 RAM filesystem. The harness checks batch size and available space before TX.
 Use distinct `--first-sequence` ranges and preserve each finite batch before
