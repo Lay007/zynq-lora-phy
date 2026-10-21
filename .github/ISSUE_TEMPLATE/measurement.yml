@@ -1,0 +1,57 @@
+name: Experiment or measurement
+description: Propose or document an evidence-backed PHY, timing, or RF experiment
+title: "[Experiment] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        State the measurable question first. Model, RTL, implementation, and
+        physical-board results are different types of evidence; do not merge them.
+  - type: textarea
+    id: question
+    attributes:
+      label: Goal and acceptance criteria
+      description: Quantity, expected units, threshold, raw counts, and decision rule
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Setup and controlled variables
+      description: Board/firmware/software revisions, SF/BW/CR, sample clock, RF path, gain, SNR definition, seed
+    validations:
+      required: true
+  - type: dropdown
+    id: evidence_stage
+    attributes:
+      label: Evidence stage
+      options:
+        - Proposal only
+        - MATLAB / C++ / Python model
+        - RTL simulation
+        - Synthesis / timing report
+        - Board capture / RF measurement
+        - Multiple stages, explicitly separated
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: Reproduction procedure
+      description: Commands, dataset manifest, golden vector, and pass/fail calculations
+    validations:
+      required: true
+  - type: textarea
+    id: limitations
+    attributes:
+      label: Known limits and calibration
+      description: Timing offsets, bias, missing modes, uncertainty, or unverified assumptions
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Public evidence links
+      description: Link only redistributable files. Raw IQ must follow the Git LFS provenance rules.
+    validations:
+      required: false
