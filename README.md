@@ -50,6 +50,30 @@ defines why generated LoRa HDL is not duplicated there.
 - Keep experiments reproducible through versioned configurations, captures,
   metrics, and reports.
 
+## Start here: review and contribute
+
+The public baseline is intended to be reviewable without an FPGA board. Begin
+with software checks and only then move to FPGA/hardware-specific work.
+
+| Interest | Start with | Evidence expected |
+|---|---|---|
+| C++ / Python DSP | [Code and tests](cpp/), [Python tests](tests/) | Deterministic regression, defined numerical tolerance, reproducible command |
+| MATLAB / Simulink | [MATLAB model](model/matlab/), [development guide](docs/development.md) | Golden vectors and model-stage agreement |
+| FPGA / Verilog | [FPGA code](fpga/), [development guide](docs/development.md) | Self-checking RTL test, fixed-point/latency contract, applicable toolchain |
+| RF / LoRa measurement | [PER experiment](docs/per-curves-experiment.md), [test bench](docs/test-bench.md) | Configuration, raw counts, provenance, and stated measurement limits |
+
+For a first contribution, documentation or a reproducible test is preferable to
+a new hardware mode without a complete validation setup. The committed FPGA
+receiver is qualified for SF7/BW125; other configurations need regenerated DSP,
+RTL verification, routed timing sign-off, and their own measurements. A passing
+unit test or green CI job alone is not hardware qualification.
+
+See [contribution instructions](CONTRIBUTING.md), the
+[open issues](https://github.com/Lay007/zynq-lora-phy/issues) and the
+[roadmap](docs/roadmap.md). For new issues, record the exact mode, environment,
+expected/observed behavior and reproducible evidence. Do not attach private IQ
+captures or board-specific secrets.
+
 ### Engineering collaboration
 
 This repository also serves as public evidence for focused R&D work in LoRa/CSS
