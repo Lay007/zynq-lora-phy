@@ -31,21 +31,27 @@ assertSuccess(results);
 
 ## Commit policy
 
-Keep commits small and outcome-oriented. The subject should answer **what was done**,
-not describe an intention or a future task. Prefer result wording such as:
+Keep commits small and outcome-oriented. The subject should answer **what was done
+and why**, not describe an intention or a future task. Use English in public GitHub
+issues, pull requests, code comments, documentation changes and commit messages.
+Prefer technical summaries such as:
 
 ```text
-Добавлена проверка CDC метаданных
-Исправлено выравнивание packet timestamp
-Обновлено описание golden regression
+Fix packet timestamp alignment after SFD detection
+Validate CDC metadata across DMA buffer boundaries
+Document the golden-vector regression procedure
 ```
 
-Avoid combining unrelated RTL, model, documentation, and infrastructure changes in one
-commit when they can be reviewed independently.
+Avoid generic descriptions, unverified performance claims and AI co-author
+trailers. Credit the people who actually contributed to the implementation and
+review. Avoid combining unrelated RTL, model, documentation, and infrastructure
+changes in one commit when they can be reviewed independently.
 
-Work on the default `main` branch unless the task explicitly names another branch. Historical
-or experimental branches, including `lora_cpp`, must not be used as an implicit target for
-new changes, rebases, merges, or cleanup.
+External contributors should work on a topic branch or fork and open a pull
+request against `main`, linking an issue or defining explicit acceptance
+criteria. Maintainer-directed changes may go directly to `main`. Historical
+or experimental branches, including `lora_cpp`, must not be used as an implicit
+target for new changes, rebases, merges, or cleanup.
 
 ## Evidence vocabulary
 
