@@ -33,7 +33,9 @@ assertSuccess(results);
 
 Keep commits small and outcome-oriented. The subject should answer **what was done
 and why**, not describe an intention or a future task. Use English in public GitHub
-issues, pull requests, code comments, documentation changes and commit messages.
+issues, pull requests, code comments and commit messages. Keep English as the
+primary documentation language and update existing Russian translations when
+applicable.
 Prefer technical summaries such as:
 
 ```text
