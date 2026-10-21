@@ -1,0 +1,52 @@
+name: Reproducible defect
+description: Report a failure in the model, C++/Python tools, RTL, or board workflow
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe one observed defect per issue. Include enough detail for another
+        engineer to reproduce it. Remove private data, credentials, and raw captures
+        that are not approved for public redistribution.
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected layer
+      options:
+        - C++ / Python software
+        - MATLAB / Simulink
+        - RTL / FPGA
+        - Firmware / board / RF
+        - Documentation / tooling
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and configuration
+      description: Commit SHA, tools and versions, device, SF/BW/CR, sample rate, and SNR where relevant
+      placeholder: "Commit: ...; toolchain: ...; SF7/BW125/CR4/5; ..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands, test vector, seed, or capture metadata without private data
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Expected and observed results
+      description: Include error messages and raw pass/fail counts where relevant
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Validation evidence and boundaries
+      description: Link a failing test or report. Distinguish model, RTL, synthesis, and hardware observations.
+    validations:
+      required: false
