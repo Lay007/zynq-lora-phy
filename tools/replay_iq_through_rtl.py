@@ -78,8 +78,8 @@ def parse_output(text: str) -> dict[str, object]:
     }
 
 
-def run_one(job: tuple[Path, int, str, Path, bool, int]) -> dict[str, object]:
-    iq_path, shift, vvp_file, workdir, wait_joint, lead = job
+def run_one(job: tuple[Path, int, str, Path, bool, int, int]) -> dict[str, object]:
+    iq_path, shift, vvp_file, workdir, wait_joint, lead, gap_det = job
     iq = load_iq(iq_path)
     burst_start, _ = burst_bounds(iq)
     start = burst_start - lead - shift
@@ -96,6 +96,7 @@ def run_one(job: tuple[Path, int, str, Path, bool, int]) -> dict[str, object]:
                 "+iq=" + hex_path.as_posix(),
                 f"+n={count}",
                 f"+wait_joint={int(wait_joint)}",
+                f"+gap_det={gap_det}",
             ],
             capture_output=True,
             text=True,
@@ -133,13 +134,29 @@ def main() -> int:
         "detector sees these as silence, and a long stretch of it is what "
         "exposes rules that a quiet input satisfies for free",
     )
+    parser.add_argument(
+        "--gap-det",
+        type=int,
+        default=1,
+        help="clocks per sample from the detection until the joint result "
+        "(tb_replay_detect +gap_det); 63 is the board's 1 MS/s at 62.5 MHz, "
+        "and the joint search's outcome can depend on it",
+    )
     parser.add_argument("--out", type=Path, default=Path("replay_sweep.json"))
     args = parser.parse_args()
 
     phases = parse_phases(args.phases)
     with tempfile.TemporaryDirectory() as tmp:
         jobs = [
-            (path, shift, args.vvp_file, Path(tmp), not args.no_joint, args.lead)
+            (
+                path,
+                shift,
+                args.vvp_file,
+                Path(tmp),
+                not args.no_joint,
+                args.lead,
+                args.gap_det,
+            )
             for path in args.iq
             for shift in phases
         ]

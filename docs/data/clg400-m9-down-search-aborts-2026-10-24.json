@@ -1,0 +1,1489 @@
+{
+  "schema": "zynq-lora-m9-down-search-aborts-v1",
+  "recorded_utc": "2026-10-24",
+  "issue": "#33",
+  "claim_under_test": "The residual M9 CRC failures are packets on which the joint SFD down search aborted, so no CFO derotation or fine correction was applied, and the abort is a search-window margin at one arrival phase rather than a channel loss.",
+  "result": "Supported. 13 of 14 header-valid CRC failures have down_search_aborted and no precise correction; 0 of 3764 CRC-valid packets do. All 13 recordings decode exactly from IQ after a half-bin rotation. RTL replay at the board's phase reproduces all 13 on the M9 RTL and on the current RTL; SEARCH_RADIUS=24 with PREFETCH_UP=1 leaves none of the 13 failing in the replay.",
+  "population": {
+    "header_valid_traces": 3778,
+    "crc_valid": 3764,
+    "crc_valid_with_precise_correction_and_no_abort": 3764,
+    "crc_failed_down_search_aborted": 13,
+    "crc_failed_with_precise_correction": 1,
+    "crc_failed_with_precise_correction_note": "20260926T083257Z, truncated payload windows on a weak packet (#32, closed by M10)",
+    "preamble_bin_32_to_96": {
+      "crc_valid": 1883,
+      "down_search_aborted": 13
+    }
+  },
+  "revisions": {
+    "m9_rtl": "92d5241",
+    "current_rtl": "f1d2fcd"
+  },
+  "commands": {
+    "build": "iverilog -g2012 -DLORA_NAMESPACED_GENERATED -s tb_replay_detect -Ptb_replay_detect.PREFETCH_UP=<0|1> [-Ptb_replay_detect.SEARCH_RADIUS=24] -o <vvp> <receiver-top sources of .github/workflows/rtl-ci.yml> fpga/tb/tb_replay_detect.sv",
+    "replay": "python tools/replay_iq_through_rtl.py --vvp-file <vvp> --gap-det 63 --phases <K-4>:<K+4>:1 experiments/runs/<run>/rx1-iq-<stamp>.bin",
+    "shift_for_board_bin": "K = (b0 - board_preamble_bin) * 8 mod 1024, b0 the detected bin at shift 0"
+  },
+  "summary_current_rtl_at_failing_shifts": {
+    "prefetch0": {
+      "aborts": 12,
+      "early_epoch_precise": 1,
+      "right_epoch_precise": 0
+    },
+    "prefetch1": {
+      "aborts": 11,
+      "early_epoch_precise": 0,
+      "right_epoch_precise": 2
+    },
+    "radius24_prefetch0": {
+      "aborts": 0,
+      "early_epoch_precise": 2,
+      "right_epoch_precise": 11
+    },
+    "radius24_prefetch1": {
+      "aborts": 0,
+      "early_epoch_precise": 0,
+      "right_epoch_precise": 13
+    }
+  },
+  "packets": [
+    {
+      "transmitted_utc": "20260926T072121Z",
+      "series": "2026-09-26-clg400-m9-day1400",
+      "board": {
+        "preamble_bin": 79,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 1,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "564": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "565": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "566": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "567": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "568": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "569": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "570": {
+          "detected_preamble_bin": 79,
+          "up_coarse": 7560,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "571": {
+          "detected_preamble_bin": 79,
+          "up_coarse": 7560,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 565,
+      "current_prefetch0": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 78,
+        "up_coarse": 7568,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260926T074349Z",
+      "series": "2026-09-26-clg400-m9-day1400",
+      "board": {
+        "preamble_bin": 49,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": -993,
+        "cfo_bins": 0.4375,
+        "bin_adjustment": 2,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "796": {
+          "detected_preamble_bin": 50,
+          "up_coarse": 7792,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "797": {
+          "detected_preamble_bin": 50,
+          "up_coarse": 7792,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "798": {
+          "detected_preamble_bin": 50,
+          "up_coarse": 7792,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "799": {
+          "detected_preamble_bin": 48,
+          "up_coarse": 7808,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "800": {
+          "detected_preamble_bin": 48,
+          "up_coarse": 7808,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "801": {
+          "detected_preamble_bin": 48,
+          "up_coarse": 7808,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "802": {
+          "detected_preamble_bin": 48,
+          "up_coarse": 7808,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "803": {
+          "detected_preamble_bin": 49,
+          "up_coarse": 7800,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 798,
+      "current_prefetch0": {
+        "detected_preamble_bin": 50,
+        "up_coarse": 7792,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 50,
+        "up_coarse": 7792,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 50,
+        "up_coarse": 7792,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 50,
+        "up_coarse": 7792,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 48,
+        "up_coarse": 7808,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260926T101022Z",
+      "series": "2026-09-26-clg400-m9-day1400",
+      "board": {
+        "preamble_bin": 64,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 1,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "676": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 6656,
+          "up_off": -7,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "677": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 7680,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "678": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 7680,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "679": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 7680,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "680": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "681": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "682": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "683": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": -8,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 676,
+      "current_prefetch0": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 6656,
+        "up_off": -7,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 7680,
+        "up_off": -7,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 6656,
+        "up_off": -7,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 7680,
+        "up_off": -7,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 6656,
+        "up_off": -5,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T070903Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 66,
+        "straddle": true,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 1,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "652": {
+          "detected_preamble_bin": 67,
+          "up_coarse": 7656,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "653": {
+          "detected_preamble_bin": 67,
+          "up_coarse": 7656,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "654": {
+          "detected_preamble_bin": 67,
+          "up_coarse": 7656,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "655": {
+          "detected_preamble_bin": 67,
+          "up_coarse": 7656,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "656": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "657": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "658": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "659": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 655,
+      "current_prefetch0": {
+        "detected_preamble_bin": 67,
+        "up_coarse": 7656,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 67,
+        "up_coarse": 7656,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 67,
+        "up_coarse": 7656,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 67,
+        "up_coarse": 7656,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 65,
+        "up_coarse": 7672,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T073325Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 39,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": -993,
+        "cfo_bins": 0.4375,
+        "bin_adjustment": 2,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "884": {
+          "detected_preamble_bin": 40,
+          "up_coarse": 7872,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "885": {
+          "detected_preamble_bin": 40,
+          "up_coarse": 7872,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "886": {
+          "detected_preamble_bin": 38,
+          "up_coarse": 7888,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "887": {
+          "detected_preamble_bin": 38,
+          "up_coarse": 7888,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "888": {
+          "detected_preamble_bin": 38,
+          "up_coarse": 7888,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "889": {
+          "detected_preamble_bin": 38,
+          "up_coarse": 7888,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "890": {
+          "detected_preamble_bin": 38,
+          "up_coarse": 7888,
+          "up_off": -3,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "891": {
+          "detected_preamble_bin": 39,
+          "up_coarse": 7880,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 885,
+      "current_prefetch0": {
+        "detected_preamble_bin": 40,
+        "up_coarse": 7872,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 40,
+        "up_coarse": 7872,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 40,
+        "up_coarse": 7872,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 40,
+        "up_coarse": 7872,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 38,
+        "up_coarse": 7888,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T073621Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 50,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": -993,
+        "cfo_bins": 0.4375,
+        "bin_adjustment": 2,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "780": {
+          "detected_preamble_bin": 51,
+          "up_coarse": 7784,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "781": {
+          "detected_preamble_bin": 51,
+          "up_coarse": 7784,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "782": {
+          "detected_preamble_bin": 49,
+          "up_coarse": 7800,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "783": {
+          "detected_preamble_bin": 49,
+          "up_coarse": 7800,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "784": {
+          "detected_preamble_bin": 49,
+          "up_coarse": 7800,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "785": {
+          "detected_preamble_bin": 49,
+          "up_coarse": 7800,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "786": {
+          "detected_preamble_bin": 50,
+          "up_coarse": 7792,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "787": {
+          "detected_preamble_bin": 50,
+          "up_coarse": 7792,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 781,
+      "current_prefetch0": {
+        "detected_preamble_bin": 51,
+        "up_coarse": 7784,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 51,
+        "up_coarse": 7784,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 51,
+        "up_coarse": 7784,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 51,
+        "up_coarse": 7784,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 49,
+        "up_coarse": 7800,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T081344Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 64,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 1,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "676": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 6656,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "677": {
+          "detected_preamble_bin": 64,
+          "up_coarse": 7680,
+          "up_off": -3,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "678": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "679": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "680": {
+          "detected_preamble_bin": 65,
+          "up_coarse": 7672,
+          "up_off": 8,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "681": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "682": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "683": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 676,
+      "current_prefetch0": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 6656,
+        "up_off": -4,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 7680,
+        "up_off": -4,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 6656,
+        "up_off": -4,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 64,
+        "up_coarse": 7680,
+        "up_off": -4,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 65,
+        "up_coarse": 7672,
+        "up_off": 6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T092824Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 75,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "588": {
+          "detected_preamble_bin": 76,
+          "up_coarse": 7584,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "589": {
+          "detected_preamble_bin": 76,
+          "up_coarse": 7584,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "590": {
+          "detected_preamble_bin": 76,
+          "up_coarse": 7584,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "591": {
+          "detected_preamble_bin": 76,
+          "up_coarse": 7584,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "592": {
+          "detected_preamble_bin": 74,
+          "up_coarse": 7600,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "593": {
+          "detected_preamble_bin": 74,
+          "up_coarse": 7600,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "594": {
+          "detected_preamble_bin": 74,
+          "up_coarse": 7600,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "595": {
+          "detected_preamble_bin": 74,
+          "up_coarse": 7600,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 591,
+      "current_prefetch0": {
+        "detected_preamble_bin": 76,
+        "up_coarse": 7584,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 76,
+        "up_coarse": 7584,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 76,
+        "up_coarse": 7584,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 76,
+        "up_coarse": 7584,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 74,
+        "up_coarse": 7600,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T095024Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 83,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "516": {
+          "detected_preamble_bin": 83,
+          "up_coarse": 7528,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "517": {
+          "detected_preamble_bin": 83,
+          "up_coarse": 7528,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "518": {
+          "detected_preamble_bin": 83,
+          "up_coarse": 7528,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "519": {
+          "detected_preamble_bin": 84,
+          "up_coarse": 7520,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "520": {
+          "detected_preamble_bin": 84,
+          "up_coarse": 7520,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "521": {
+          "detected_preamble_bin": 84,
+          "up_coarse": 7520,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "522": {
+          "detected_preamble_bin": 84,
+          "up_coarse": 7520,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "523": {
+          "detected_preamble_bin": 82,
+          "up_coarse": 7536,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 522,
+      "current_prefetch0": {
+        "detected_preamble_bin": 84,
+        "up_coarse": 7520,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 84,
+        "up_coarse": 7520,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 84,
+        "up_coarse": 7520,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 84,
+        "up_coarse": 7520,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 82,
+        "up_coarse": 7536,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T095333Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 79,
+        "straddle": false,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "548": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "549": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "550": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "551": {
+          "detected_preamble_bin": 80,
+          "up_coarse": 7552,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "552": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "553": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "554": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "555": {
+          "detected_preamble_bin": 78,
+          "up_coarse": 7568,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 551,
+      "current_prefetch0": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 80,
+        "up_coarse": 7552,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 78,
+        "up_coarse": 7568,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T105612Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 55,
+        "straddle": true,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "740": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "741": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "742": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "743": {
+          "detected_preamble_bin": 54,
+          "up_coarse": 7760,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "744": {
+          "detected_preamble_bin": 54,
+          "up_coarse": 7760,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "745": {
+          "detected_preamble_bin": 54,
+          "up_coarse": 7760,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "746": {
+          "detected_preamble_bin": 54,
+          "up_coarse": 7760,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "747": {
+          "detected_preamble_bin": 55,
+          "up_coarse": 7752,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 742,
+      "current_prefetch0": {
+        "detected_preamble_bin": 56,
+        "up_coarse": 7744,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 56,
+        "up_coarse": 7744,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 56,
+        "up_coarse": 7744,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 56,
+        "up_coarse": 7744,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 54,
+        "up_coarse": 7760,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T120606Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 57,
+        "straddle": true,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "724": {
+          "detected_preamble_bin": 58,
+          "up_coarse": 7728,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "725": {
+          "detected_preamble_bin": 58,
+          "up_coarse": 7728,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "726": {
+          "detected_preamble_bin": 58,
+          "up_coarse": 7728,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "727": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "728": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "729": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "730": {
+          "detected_preamble_bin": 56,
+          "up_coarse": 7744,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "731": {
+          "detected_preamble_bin": 57,
+          "up_coarse": 7736,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 726,
+      "current_prefetch0": {
+        "detected_preamble_bin": 58,
+        "up_coarse": 7728,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 58,
+        "up_coarse": 7728,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 58,
+        "up_coarse": 7728,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 58,
+        "up_coarse": 7728,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 56,
+        "up_coarse": 7744,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    },
+    {
+      "transmitted_utc": "20260927T123959Z",
+      "series": "2026-09-27-clg400-m9-gain37",
+      "board": {
+        "preamble_bin": 62,
+        "straddle": true,
+        "down_search_aborted": true,
+        "precise_correction_applied": false
+      },
+      "iq_decode": {
+        "shift": 0,
+        "cfo_bins": -0.5,
+        "bin_adjustment": 0,
+        "crc_and_payload_exact": true
+      },
+      "replay_m9_rtl_gap_det_63": {
+        "684": {
+          "detected_preamble_bin": 62,
+          "up_coarse": 7696,
+          "up_off": -6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "685": {
+          "detected_preamble_bin": 62,
+          "up_coarse": 7696,
+          "up_off": -5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "686": {
+          "detected_preamble_bin": 62,
+          "up_coarse": 7696,
+          "up_off": -4,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "687": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": 5,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "688": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": 6,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "689": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": 7,
+          "down_search_aborted": false,
+          "precise": true
+        },
+        "690": {
+          "detected_preamble_bin": 63,
+          "up_coarse": 7688,
+          "up_off": 8,
+          "down_search_aborted": true,
+          "precise": false
+        },
+        "691": {
+          "detected_preamble_bin": 61,
+          "up_coarse": 7704,
+          "up_off": -7,
+          "down_search_aborted": false,
+          "precise": true
+        }
+      },
+      "failing_shift": 690,
+      "current_prefetch0": {
+        "detected_preamble_bin": 63,
+        "up_coarse": 7688,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_prefetch1": {
+        "detected_preamble_bin": 63,
+        "up_coarse": 7688,
+        "up_off": 8,
+        "down_search_aborted": true,
+        "precise": false
+      },
+      "current_radius24_prefetch0": {
+        "detected_preamble_bin": 63,
+        "up_coarse": 7688,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch1": {
+        "detected_preamble_bin": 63,
+        "up_coarse": 7688,
+        "up_off": 8,
+        "down_search_aborted": false,
+        "precise": true
+      },
+      "current_radius24_prefetch0_control_shift_plus2": {
+        "detected_preamble_bin": 61,
+        "up_coarse": 7704,
+        "up_off": -6,
+        "down_search_aborted": false,
+        "precise": true
+      }
+    }
+  ],
+  "evidence_boundary": [
+    "The replay feeds 24k samples after the burst (23 symbol windows), so it shows the joint controller's outcome, not a decoded packet.",
+    "SEARCH_RADIUS=24 was tried in the replay testbench only; its latency against the SFD deadline, resources and timing are not measured, and it has not run on the board.",
+    "One transmitter: the CFO displacement on this bench is -3.6..-3.9 samples on every packet; the margin needed depends on the transmitter population.",
+    "IQ decode uses a data-aided search (transmitted symbols known) to propose the point; acceptance is the ordinary decoder's header checksum and payload CRC plus the exact transmitted payload.",
+    "Raw recordings are not in Git (experiments/runs is ignored)."
+  ]
+}
