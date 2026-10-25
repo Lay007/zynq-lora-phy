@@ -2676,3 +2676,25 @@ synthesised or run on the board. The CFO of this bench is one transmitter's;
 the margin needed is `8 + 2 x max |CFO displacement| + 1`, which depends on
 the transmitter population. Per-packet data and the commands are in
 [`data/clg400-m9-down-search-aborts-2026-10-24.json`](data/clg400-m9-down-search-aborts-2026-10-24.json).
+
+### The qualified joint-search setting covers it; the CLG400 bridge now uses it -- 2026-10-25
+
+`docs/joint-search-latency.md` already qualifies a setting for the full-packet
+regression: `SEARCH_RADIUS=48`, `GRID_FINE_GUARD_SAMPLES=48`,
+`MATCH_REQUEST_ON_RESPONSE=1`, `JOINT_PREFETCH_UP=1`, `MATCH_COARSE_STRIDE=2`.
+`tools/joint_packet_regression.py` builds the receiver with exactly these, but
+`lora_clg400_gpreg_bridge` instantiated the receiver with the defaults, so the
+board ran a configuration the regression does not test.
+
+Replayed with the qualified setting (`--gap-det 63`, current RTL), the 13
+failing shifts and the 13 control shifts all complete in the right epoch with a
+precise correction: no abort and no early epoch, including 101022Z at 678,
+which radius 24 without the retry had moved a symbol early. The wider window
+is not slower: stride 2 needs 49 coarse plus 5 fine correlations at 1027
+clocks each with the fast MAC (~55.5k clocks, matching the documented 55,613
+launch-to-fine), against 33 at 2050 clocks (~67.7k) for the defaults.
+
+The bridge now passes the qualified setting. `tb_lora_clg400_gpreg_bridge`
+passes with it (Icarus). Not done: synthesis, routed timing, resources and DRC
+of the board image, and any RF series; the replay still covers the joint
+controller's outcome only.
