@@ -12,7 +12,10 @@ channel whose amplitude stays approximately constant across the preamble/SFD;
 fast fading and noise performance require RF qualification.
 
 Three optional receiver parameters reduce search latency. Their defaults
-preserve the existing serial search and resource architecture:
+preserve the existing serial search and resource architecture. The CLG400
+board bridge (`fpga/board/clg400/lora_clg400_gpreg_bridge.v`) uses the
+qualified setting; with the defaults the SFD down search can abort at one
+arrival phase (#33, `docs/clg400-joint-grid-experiment.md`):
 
 | Parameter | Default | Qualified experimental setting |
 | --- | ---: | ---: |
