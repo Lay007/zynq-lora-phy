@@ -157,9 +157,19 @@ module lora_clg400_gpreg_bridge #(
     wire [1:0] unused_rresp;
     wire unused_rvalid;
 
+    // The joint search uses the setting tools/joint_packet_regression.py
+    // qualifies (docs/joint-search-latency.md). The defaults (+/-16 samples,
+    // no epoch retry) let the SFD down peak leave the window when the coarse
+    // residual is +8 and the CFO adds ~7.6: 13 of 14 M9 CRC failures
+    // (docs/clg400-joint-grid-experiment.md, #33).
     lora_packet_toa_receiver_top #(
         .SPREADING_FACTOR(SPREADING_FACTOR),
         .SAMPLES_PER_CHIP(SAMPLES_PER_CHIP),
+        .SEARCH_RADIUS(48),
+        .GRID_FINE_GUARD_SAMPLES(48),
+        .MATCH_REQUEST_ON_RESPONSE(1),
+        .JOINT_PREFETCH_UP(1),
+        .MATCH_COARSE_STRIDE(2),
         .DEFAULT_RECEIVER_ENABLE(1'b1),
         .REFERENCE_FILE(REFERENCE_FILE)
     ) u_receiver (

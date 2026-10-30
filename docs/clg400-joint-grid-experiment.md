@@ -2583,3 +2583,118 @@ attempts, 0 dB and 12 dB interleaved, 300 attempts each (runs
 Rescue paths in the M10 experiment: straddle 11 + 12, split 4 + 1, early-sync
 0, all CRC valid; 2 recordings without a packet (send timing) and 5
 transmitter-side failures; no crossing drop. Issue #32 closed.
+
+## M9 CRC residuals (#33): the SFD down search aborts at one arrival phase -- 2026-10-24
+
+The M9 section above left nine of twelve CRC failures that "decode at no grid
+offset even derotated". Re-reading all fourteen header-valid CRC failures of the
+M9 series (`2026-09-26-clg400-m9-day1400`: 4, `2026-09-27-clg400-m9-gain37`: 10)
+against their own traces gives a different and simpler answer: on thirteen of
+them the board never derotated at all.
+
+**The joint estimate was never applied.** Across every header-valid M9 trace:
+
+| | CRC valid | CRC failed |
+|---|---|---|
+| `precise_correction_applied`, no search aborted | 3764 | 1 |
+| `down_search_aborted`, no estimate, no precise correction | 0 | 13 |
+
+The one CRC failure with a precise correction is 083257Z, the weak packet with
+truncated payload windows (#32, closed by M10). On the other thirteen the
+controller returned the withheld guard without a fine correction, so the
+carrier offset (about half a bin on this transmitter, CFO displacement
+-3.6..-3.9 samples on every packet) stayed in the correlator input. The
+derotated reference model of the M9 section tested a correction the board had
+not made. The PL decisions show the expected signature: every symbol error is
++1 bin (+2 on three packets), at reduced confidence.
+
+The signal itself is fine. Rebuilding the transmitted symbols from the ZLP1
+log (`zlp1_payload`), all thirteen recordings decode with header checksum,
+payload CRC and the exact transmitted payload once the IQ is rotated by half a
+bin, with no grid correction: ten on the header grid reconstructed from the
+trace, three one symbol from it (the reconstruction assumes the resync at
+trace entry 2; on these three the board's own decisions were within +1/+2
+bins of the transmitted ones, so the miss is the reconstruction's, not the
+board's). The nine "decode at no offset" of the M9 section were searched with
+whole-bin adjustments only, which cannot remove a half-bin offset.
+
+**The aborts sit at one arrival phase.** The preamble bin of the good packets is
+uniform (1883 of 3764 in 32..96); all thirteen aborts are in 39..83 (chance
+about 1e-4 for 13/13).
+
+**RTL replay reproduces all thirteen.** `tools/replay_iq_through_rtl.py` gains
+`--gap-det` (passed to `tb_replay_detect` as `+gap_det`; default 1 keeps the
+old behaviour). Each recording was replayed at the eight shifts inside the
+board's preamble bin, with the board's sample cadence after detection
+(`--gap-det 63`), through the M9 RTL (`92d5241`, the image the series ran on):
+
+- 12 recordings abort the down search at exactly one of the eight shifts, the
+  shift where the detected preamble bin steps by two (e.g. 80 -> 78);
+- 081344Z at its failing shift instead completes the joint search a whole
+  symbol early (`up_coarse` 6656 instead of ~7672) with `precise=1`;
+- the other 91 of 104 replays complete normally.
+
+A first replay at one sample per clock and only three shifts (K-4, K, K+4 around
+the bin's nominal shift K) reproduced one abort; it missed most failing shifts,
+and whether the cadence or the coarser phase step decided that was not
+separated.
+
+**Why: the down peak leaves the search window.** At the 11 aborting shifts that
+are not the half-symbol case the replay reports `up_off=+8`, against
+`up_off=+8` on 1 of 92 good shifts. The coarse start is quantised to a chip, so
+its residual is at most +/-8 samples, and the CFO moves the down peak a further
+~2 x 3.8 samples from the up peak. At +8 the down peak lands at ~15.6 samples,
+on or beyond `SEARCH_RADIUS=16`, where a triplet cannot be formed and the
+search fails.
+
+**What the current RTL does** (`f1d2fcd`, same shifts, `--gap-det 63`):
+
+| 13 failing shifts | aborts | epoch one symbol early, `precise=1` | precise, right epoch |
+|---|---|---|---|
+| `PREFETCH_UP=0` (default, as built here) | 12 | 1 | 0 |
+| `PREFETCH_UP=1` (bounded epoch retry, `9b0fd38`) | 11 | 0 | 2 |
+| `SEARCH_RADIUS=24`, `PREFETCH_UP=0` | 0 | **2** | 11 |
+| `SEARCH_RADIUS=24`, `PREFETCH_UP=1` | 0 | 0 | **13** |
+
+The current RTL behaves exactly as the M9 RTL; nothing after M9 changed this
+path. The epoch retry fixes only the two half-symbol cases (preamble bin 64).
+A wider window alone is worse than the abort: it turns two visible CRC failures
+into a ToA one symbol early with a precise flag, the same signature as the
+SF7/BW125 ID=131 outlier. Both together leave none of the thirteen failing.
+The control, one good shift two samples later per recording at radius 24
+without the retry, shows the same hazard: 12 of 13 stay right, but 101022Z at
+678, right epoch at radius 16, moves to the early epoch with `precise=1`.
+(The controls were not repeated with the retry.)
+
+**Evidence boundary.** The replay feeds 24k samples after the burst start
+(23 symbol windows: preamble, sync, SFD and the first header symbols), so it
+shows the joint controller's outcome, not a decoded packet; "right epoch,
+precise" is not a CRC result. `SEARCH_RADIUS=24` was tried in the replay
+testbench only: a wider search lengthens the down-search latency against the
+SFD deadline (`docs/joint-search-latency.md`) and has not been timed,
+synthesised or run on the board. The CFO of this bench is one transmitter's;
+the margin needed is `8 + 2 x max |CFO displacement| + 1`, which depends on
+the transmitter population. Per-packet data and the commands are in
+[`data/clg400-m9-down-search-aborts-2026-10-24.json`](data/clg400-m9-down-search-aborts-2026-10-24.json).
+
+### The qualified joint-search setting covers it; the CLG400 bridge now uses it -- 2026-10-25
+
+`docs/joint-search-latency.md` already qualifies a setting for the full-packet
+regression: `SEARCH_RADIUS=48`, `GRID_FINE_GUARD_SAMPLES=48`,
+`MATCH_REQUEST_ON_RESPONSE=1`, `JOINT_PREFETCH_UP=1`, `MATCH_COARSE_STRIDE=2`.
+`tools/joint_packet_regression.py` builds the receiver with exactly these, but
+`lora_clg400_gpreg_bridge` instantiated the receiver with the defaults, so the
+board ran a configuration the regression does not test.
+
+Replayed with the qualified setting (`--gap-det 63`, current RTL), the 13
+failing shifts and the 13 control shifts all complete in the right epoch with a
+precise correction: no abort and no early epoch, including 101022Z at 678,
+which radius 24 without the retry had moved a symbol early. The wider window
+is not slower: stride 2 needs 49 coarse plus 5 fine correlations at 1027
+clocks each with the fast MAC (~55.5k clocks, matching the documented 55,613
+launch-to-fine), against 33 at 2050 clocks (~67.7k) for the defaults.
+
+The bridge now passes the qualified setting. `tb_lora_clg400_gpreg_bridge`
+passes with it (Icarus). Not done: synthesis, routed timing, resources and DRC
+of the board image, and any RF series; the replay still covers the joint
+controller's outcome only.

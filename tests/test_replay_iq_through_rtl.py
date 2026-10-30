@@ -62,3 +62,36 @@ def test_output_parser_reports_a_missed_packet_as_no_detection() -> None:
 
     assert parsed["det"] == []
     assert parsed["psc"] == []
+
+
+def _write_burst(path) -> None:
+    rng = np.random.default_rng(3)
+    iq = 2.0 * (rng.standard_normal(40_000) + 1j * rng.standard_normal(40_000))
+    iq[20_000:30_000] *= 400.0
+    raw = np.empty(iq.size * 2, dtype="<i2")
+    raw[0::2] = np.round(iq.real).astype("<i2")
+    raw[1::2] = np.round(iq.imag).astype("<i2")
+    raw.tofile(path)
+
+
+def test_run_one_passes_the_detection_sample_gap_to_the_simulator(
+    tmp_path, monkeypatch
+) -> None:
+    import subprocess
+
+    from tools import replay_iq_through_rtl as replay
+
+    iq_path = tmp_path / "rx1-iq-test.bin"
+    _write_burst(iq_path)
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, stdout="DONE detected=0", stderr="")
+
+    monkeypatch.setattr(replay.subprocess, "run", fake_run)
+
+    replay.run_one((iq_path, 8, "replay_tb", tmp_path, True, 2048, 63))
+
+    assert "+gap_det=63" in seen["cmd"]
+    assert "+wait_joint=1" in seen["cmd"]

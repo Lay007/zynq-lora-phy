@@ -35,6 +35,7 @@ This directory contains the engineering documentation for the LoRa PHY and posit
 - [CLG400 twelve-capture baseline evidence](data/clg400-stage-differential-baseline-2026-09-08.json)
 - [CLG400 joint-grid experiment result](data/clg400-joint-grid-result-2026-09-08.json)
 - [CLG400 guard-return hardware evidence](data/clg400-guard-return-2026-09-09.json)
+- [CLG400 M9 CRC residuals: SFD down-search aborts (#33)](data/clg400-m9-down-search-aborts-2026-10-24.json)
 - [Joint up/down sample-grid RTL evidence](data/rtl-joint-chirp-grid-2026-09-04.json)
 - [CLG400 board-level synthesis evidence](data/rtl-m4-clg400-board-synthesis.csv)
 - [CLG400 board-level implementation evidence](data/rtl-m4-clg400-board-implementation.csv)
