@@ -1,0 +1,14 @@
+name: Commit attribution guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: Lay007/lay007/.github/workflows/reusable-commit-attribution.yml@6b5f2280224ae427e9a634970798f00f8891b803
