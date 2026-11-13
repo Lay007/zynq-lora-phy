@@ -23,14 +23,20 @@ Run the regressions that cover the part you touch; CI runs all of them.
 |---|---|
 | Python reference, host tools, decoder | `pytest` |
 | MATLAB model | `matlab -batch "cd model/matlab; r = run_tests; assertSuccess(r)"` |
-| Simulink timestamp metadata | `matlab -batch "cd model/simulink; r = run_timestamp_metadata_regression; assert(r.passed)"` |
-| RTL wrappers and integration | the `rtl-wrapper-smoke` job in `.github/workflows/ci.yml` (each step is a plain `iverilog` + `vvp` command) |
+| Simulink timestamp metadata | `matlab -batch "cd model/simulink; r = run_timestamp_metadata_regression(WriteCsv=false); assert(r.passed)"` |
+| RTL wrappers and integration | the `rtl-wrapper-smoke` job in `.github/workflows/rtl-ci.yml` (each step is a plain `iverilog` + `vvp` command) |
 | Receiver on synthetic packets, several grid phases and CFO | the `joint-grid-completion` and `joint-grid-multi-packet` jobs |
+| Full-packet CRC, final ToA and processing deadline | `python tools/joint_packet_regression.py --out build/joint-baseline` (Linux/WSL, Verilator) |
 | Receiver on recorded IQ | `python tools/replay_iq_through_rtl.py --help` |
 
 A change that alters receiver behaviour on hardware should also be checked on
 the PER bench (`docs/per-curves-experiment.md`) and recorded with its
 configuration and board state.
+
+Use a new output directory for each full-packet run. The optional `--suite timing`
+adds a deterministic SFO/noise matrix; see [the regression contract](joint-toa-regression.md).
+The Simulink command above avoids overwriting versioned CSV evidence. To retain
+a new CSV, pass an explicit `OutputDirectory` under an ignored artifact directory.
 
 ## Generated HDL
 

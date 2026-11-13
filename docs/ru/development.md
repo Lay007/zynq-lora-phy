@@ -37,14 +37,21 @@
 |---|---|
 | Эталонный Python-пакет, инструменты хоста, декодер | `pytest` |
 | MATLAB-модель | `matlab -batch "cd model/matlab; r = run_tests; assertSuccess(r)"` |
-| Метаданные меток времени в Simulink | `matlab -batch "cd model/simulink; r = run_timestamp_metadata_regression; assert(r.passed)"` |
-| Обёртки и интеграция RTL | задание `rtl-wrapper-smoke` в `.github/workflows/ci.yml` (каждый шаг — обычная команда `iverilog` + `vvp`) |
+| Метаданные меток времени в Simulink | `matlab -batch "cd model/simulink; r = run_timestamp_metadata_regression(WriteCsv=false); assert(r.passed)"` |
+| Обёртки и интеграция RTL | задание `rtl-wrapper-smoke` в `.github/workflows/rtl-ci.yml` (команды `iverilog` + `vvp`) |
 | Приёмник на синтетических пакетах, несколько фаз сетки и частотный сдвиг | задания `joint-grid-completion` и `joint-grid-multi-packet` |
+| CRC полного пакета, итоговая ToA и срок завершения обработки | `python tools/joint_packet_regression.py --out build/joint-baseline` (Linux/WSL, Verilator) |
 | Приёмник на записанных IQ | `python tools/replay_iq_through_rtl.py --help` |
 
 Изменение, влияющее на работу приёмника на плате, нужно также проверить на
 стенде PER (`docs/per-curves-experiment.md`) и записать вместе с конфигурацией и
 состоянием платы.
+
+Для каждого пакетного прогона используйте новый каталог вывода. Параметр
+`--suite timing` добавляет детерминированную матрицу SFO/шума; подробнее в
+[описании проверки](joint-toa-regression.md). Приведённая команда Simulink
+не перезаписывает версионируемые CSV. Для сохранения нового CSV укажите
+`OutputDirectory` в каталоге артефактов, исключённом из Git.
 
 ## Сгенерированный HDL
 

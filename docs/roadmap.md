@@ -3,6 +3,13 @@
 The roadmap uses measurable gates. Dates are intentionally omitted: a stage is
 complete only when its acceptance evidence is committed or linked.
 
+Some M4 checkboxes below retain the earlier bring-up scope. Published SF7/BW125
+cable PER curves now exist in [the bench report](per-curves-experiment.md),
+and [finite-series accounting](finite-per-bench.md) addresses the historical
+continuous-series denominator limitation. Those results do not close the
+remaining CFO/SFO, calibrated ToA or multi-receiver gates. For offline final-ToA
+checks, see [the full-packet regression](joint-toa-regression.md).
+
 ## M0 — Reproducible repository
 
 - [x] MATLAB project layout and automated floating-point CSS tests.

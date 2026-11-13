@@ -54,6 +54,10 @@ Run the full-packet regression on Linux with Verilator and the package installed
 python tools/joint_packet_regression.py --out build/joint-full-packet
 ```
 
+Use a new or empty output directory. The runner retains all failed cases and
+produces a complete accounting summary. The optional `--suite timing` adds
+SFO and seeded-noise cases; see [the regression contract](joint-toa-regression.md).
+
 Seventeen complete, noise-free standard packets exercise both CFO signs at
 418/1000/1500 Hz, fractional delays of 0.25/0.5/0.75 sample, arrival phases
 around the half-symbol boundary, and preambles of 8/12 symbols.

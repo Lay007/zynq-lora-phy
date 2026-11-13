@@ -7,6 +7,10 @@ on:
       - "fpga/**"
       - "src/**"
       - "tools/joint_packet_regression.py"
+      - "tools/joint_packet_checks.py"
+      - "tools/lora_tx_waveform.py"
+      - "tools/lora_per_ideal.py"
+      - "tests/test_joint_packet_checks.py"
       - "pyproject.toml"
       - ".github/workflows/rtl-ci.yml"
   pull_request:
@@ -14,6 +18,10 @@ on:
       - "fpga/**"
       - "src/**"
       - "tools/joint_packet_regression.py"
+      - "tools/joint_packet_checks.py"
+      - "tools/lora_tx_waveform.py"
+      - "tools/lora_per_ideal.py"
+      - "tests/test_joint_packet_checks.py"
       - "pyproject.toml"
       - ".github/workflows/rtl-ci.yml"
   workflow_dispatch:
@@ -194,9 +202,13 @@ jobs:
           vvp /tmp/lora_joint_grid_multi_packet_tb
 
   joint-full-packet:
-    name: Joint ToA/CFO full packet and deadline
+    name: Joint ToA/CFO full packet (${{ matrix.suite }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [baseline, timing]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -208,11 +220,11 @@ jobs:
           sudo apt-get install -y verilator
           python -m pip install -e ".[dev]"
       - name: Decode full packets and verify ToA and header deadline
-        run: python tools/joint_packet_regression.py --out build/joint-full-packet
+        run: python tools/joint_packet_regression.py --suite ${{ matrix.suite }} --out build/joint-full-packet
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: joint-full-packet
+          name: joint-full-packet-${{ matrix.suite }}
           path: |
             build/joint-full-packet/*.json
             build/joint-full-packet/*.log
