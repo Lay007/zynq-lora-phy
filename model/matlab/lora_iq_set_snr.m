@@ -5,6 +5,7 @@ function [y, info] = lora_iq_set_snr(file, snr_db, varargin)
 %   the same level and adds white complex Gaussian noise so that the SNR in the LoRa
 %   bandwidth is SNR_DB. The recording's own noise is dropped (only the in-channel
 %   part is kept, ~40 dB below the signal), so the output has the noise you ask for.
+%   FILE can also be a complex vector of samples in int16 units.
 %
 %   Options (name, value):
 %     'Out'         output .iq file (int16 I,Q) or '' for none   ('')
@@ -51,10 +52,16 @@ end
 
 % ---- read -----------------------------------------------------------------------------
 n  = round(o.Duration * fs);
-fid = fopen(file, 'r'); fseek(fid, round(o.Start * fs) * 4, 'bof');
-raw = fread(fid, [2, n], 'int16=>single'); fclose(fid);
-n = size(raw, 2);
-z = complex(raw(1, :), raw(2, :)).'; clear raw
+n0 = round(o.Start * fs);
+if isnumeric(file)                                 % samples given directly (int16 units)
+    z = single(file(n0+1:min(end, n0+n)));
+    z = z(:); n = numel(z);
+else
+    fid = fopen(file, 'r'); fseek(fid, n0 * 4, 'bof');
+    raw = fread(fid, [2, n], 'int16=>single'); fclose(fid);
+    n = size(raw, 2);
+    z = complex(raw(1, :), raw(2, :)).'; clear raw
+end
 
 % ---- cut every dwell out, measure its signal power --------------------------------------
 margin = round(100e-6 * fs);                       % room for the filter ends
@@ -82,7 +89,8 @@ for j = 1:nd
     s = ifft(F);
     pw = abs(s).^2;
     pwf = movmean(pw, round(51e-6 * fs));          % frame-length smoothing
-    hot = pwf > 0.5 * prctile(pwf, 90);            % samples with signal (not the gaps)
+    ps = sort(pwf);
+    hot = pwf > 0.5 * ps(ceil(0.9 * numel(ps)));   % samples with signal (not the gaps)
     hot(1:tw) = false; hot(end-tw+1:end) = false;
     Sj(j) = mean(pw(hot));
     pieces{j} = s; rng_(j, :) = [a b];
@@ -124,12 +132,12 @@ if ~isempty(o.Out)
     q(2, :) = int16(max(min(round(imag(y)), 32767), -32768));
     fid = fopen(o.Out, 'w'); fwrite(fid, q, 'int16'); fclose(fid);
     fprintf('Written %s (%.2f s, %.0f MB)\n', o.Out, n/fs, n*4/1e6);
-    if snr_db >= 12      % below that the detector (10 dB threshold) cannot find the dwells
+    if snr_db >= 8       % lora_iq_snr reads within 0.15 dB from 2 dB above its 6 dB threshold
         chk = lora_iq_snr(o.Out, 'Fs', fs, 'BW', bw, 'Duration', o.Duration, 'Plot', false);
         info.measured_snr_db = chk.snr_db;
         fprintf('Read back: SNR median %.1f dB (requested %.1f)\n', median(chk.snr_db), snr_db);
     else
-        fprintf('Read-back skipped: SNR below the detector''s 10 dB threshold\n');
+        fprintf('Read-back skipped: SNR too close to the detector''s 6 dB threshold\n');
     end
 end
 end

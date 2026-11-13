@@ -171,6 +171,40 @@ weighted Gauss-Newton multilateration solver with residual, covariance, and
 geometry-condition diagnostics. `simulate_tdoa_accuracy` provides seeded
 position-error Monte Carlo results.
 
+## Wideband IQ recordings
+
+Four top-level functions handle long int16 I/Q recordings (interleaved I, Q,
+for example 40 MS/s from an SDR) that contain a frequency-hopping LoRa signal.
+Each also takes a complex sample vector instead of a file name.
+
+| Function | Purpose |
+| --- | --- |
+| `lora_iq_snr` | Finds the dwells (time on one channel) and the SNR of each in the LoRa bandwidth |
+| `lora_iq_identify` | Measures BW, SF, preamble length, sync word, header mode, payload size, CFO and packet period of one dwell |
+| `lora_iq_set_snr` | Makes a copy of the recording with the LoRa signal at a requested SNR |
+| `lora_iq_synth` | Builds a synthetic recording with known SNR and parameters |
+
+```matlab
+f = 'IQREC-03-07-26-10h33m43s888.iq';
+r  = lora_iq_snr(f);                          % first second, 40 MS/s
+id = lora_iq_identify(f);                     % one dwell in the first 0.1 s
+y  = lora_iq_set_snr(f, 10, Out='snr10.iq');  % the same packets at 10 dB
+```
+
+The SNR is in-band, before dechirping, and the levels are dBFS, not dBm.
+`lora_iq_identify` aligns on the preamble and SFD itself, so it assumes neither
+the sync word nor the preamble length. An implicit header leaves the payload
+length ambiguous: it lists the combinations of length, coding rate and CRC that
+fit the symbol count and keeps the one whose CRC checks, if any.
+
+`tests/TestIqRecordingTools.m` checks all four on synthetic recordings:
+
+- SNR within 0.2 dB from 10 to 40 dB;
+- no dwell from noise alone;
+- parameters identified exactly down to 10 dB SNR, including a different sync
+  word and two modes with the same chirp rate (SF9 at 250 kHz and SF11 at
+  500 kHz).
+
 ## BER definitions
 
 `simulate_uncoded_ber` compares natural binary labels of transmitted and
