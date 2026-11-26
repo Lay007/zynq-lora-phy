@@ -88,7 +88,9 @@ Raw evidence:
 
 ## ToA and TDoA evidence
 
-The existing fractional-ToA AWGN campaign contains 500 deterministic trials.
+The [fractional-ToA AWGN plot](images/toa-accuracy-awgn.png) uses 100 trials at each of five SNR levels from −25 to −5 dB (500 trials in total). The [MATLAB plotting example](../model/matlab/examples/plot_toa_accuracy.m) specifies this run.
+
+The sub-sample accuracy table below uses a separate [archived CSV](data/toa-interpolator-accuracy.csv) with 200 trials at each of +20, +10, 0, −5 and −10 dB (1,000 trials in total).
 
 ### Sub-sample accuracy, and why the interpolator was replaced
 
