@@ -10,9 +10,10 @@ function [y, info] = lora_iq_set_snr(file, snr_db, varargin)
 %   Options (name, value):
 %     'Out'         output .iq file (int16 I,Q) or '' for none   ('')
 %     'SignalDbfs'  signal level in the channel, dBFS; [] keeps the median of the
-%                   recording                                    ([])
+%                   first chunk                                  ([])
 %     'Start'       first second read from FILE                  (0)
-%     'Duration'    seconds read                                 (1)
+%     'Duration'    seconds read; Inf = to the end of FILE       (1)
+%     'Chunk'       seconds processed at a time                  (1)
 %     'Fs','BW'     as in LORA_IQ_SNR                            (40e6, 500e3)
 %     'Seed'        noise seed                                   (1)
 %     'NoiseBW'     noise bandwidth, Hz: Inf = white over Fs; less limits it to
@@ -24,17 +25,27 @@ function [y, info] = lora_iq_set_snr(file, snr_db, varargin)
 %   signal and noise are scaled down together (INFO.gain_db). INFO holds the dwell table, the levels and the SNR read
 %   back from the result by LORA_IQ_SNR.
 %
+%   A recording longer than 'Chunk' is processed chunk by chunk, so a whole
+%   recording fits in memory. Each chunk is read with 50 ms on either side, so a
+%   dwell across a chunk border (a hop lasts ~40 ms) is cut out whole. The signal
+%   level and the int16 gain are set on the first chunk and kept for the rest, and
+%   the noise is one continuous stream; samples that would still overflow int16
+%   are clipped and counted (INFO.clipped). With 'Out' and more than one chunk, Y
+%   is empty: the result is only in the file (10 s at 40 MS/s is 3.2 GB in memory).
+%
 %   The recording's own noise leaves a floor: an SNR above about 38 dB cannot be
 %   reached, and the function warns.
 %
 %   Example:
 %     [y, info] = lora_iq_set_snr('IQREC.iq', 10, 'Out', 'IQREC_snr10.iq');
+%     [~, info] = lora_iq_set_snr('IQREC.iq', 10, 'Out', 'all_snr10.iq', 'Duration', Inf);
 
 p = inputParser;
 addParameter(p, 'Out', '');
 addParameter(p, 'SignalDbfs', []);
 addParameter(p, 'Start', 0);
 addParameter(p, 'Duration', 1);
+addParameter(p, 'Chunk', 1);
 addParameter(p, 'Fs', 40e6);
 addParameter(p, 'BW', 500e3);
 addParameter(p, 'Seed', 1);
@@ -43,38 +54,142 @@ parse(p, varargin{:});
 o = p.Results;
 fs = o.Fs; bw = o.BW; fullscale = 32768;
 
-% ---- find the dwells ---------------------------------------------------------------
-r = lora_iq_snr(file, 'Fs', fs, 'BW', bw, 'Start', o.Start, 'Duration', o.Duration, 'Plot', false);
-nd = numel(r.start_s);
+n0 = round(o.Start * fs);
+n = min(source_length(file) - n0, round(o.Duration * fs));
+assert(n > 0, 'nothing to read after %.3f s', o.Start);
+nc = round(o.Chunk * fs);
+nchunks = ceil(n / nc);
+pad = 0;
+if nchunks > 1, pad = round(50e-3 * fs); end
+keep_y = isempty(o.Out) || nchunks == 1;
+y = zeros(n * keep_y, 1, 'single');
+
+St = [];
+if ~isempty(o.SignalDbfs), St = fullscale^2 * 10^(o.SignalDbfs / 10); end
+rs = RandStream('mt19937ar', 'Seed', o.Seed);
+gain = []; clipped = 0;
+dw = struct('start_s', [], 'dur_ms', [], 'fc_hz', [], 'snr_db', [], 'sig_dbfs', [], 'duty', []);
+fid = -1;
+if ~isempty(o.Out)
+    fid = fopen(o.Out, 'w'); assert(fid > 0, 'cannot write %s', o.Out);
+end
+
+for k = 1:nchunks
+    c0 = (k - 1) * nc; c1 = min(n, k * nc);        % kept samples [c0, c1) after n0
+    r0 = max(0, c0 - pad); r1 = min(n, c1 + pad);  % read with the margins
+    z = read_samples(file, n0 + r0, r1 - r0);
+
+    % ---- find the dwells, cut every one out, measure its signal power ----------------
+    r = lora_iq_snr(z, 'Fs', fs, 'BW', bw, 'Duration', numel(z) / fs, 'Plot', false);
+    [pieces, rng_, Sj] = cut_dwells(z, r, fs, bw);
+    clear z
+    if isempty(St)
+        assert(~isempty(Sj), 'no LoRa signal found in the first %.1f s', o.Chunk);
+        St = median(Sj);
+    end
+    sig = zeros(r1 - r0, 1, 'single');
+    for j = 1:numel(pieces)
+        sig(rng_(j,1):rng_(j,2)) = sig(rng_(j,1):rng_(j,2)) + pieces{j} * sqrt(St / Sj(j));
+    end
+    clear pieces
+    % the dwell table: each dwell once, in the chunk where it starts
+    s0 = r0 + round(r.start_s * fs);
+    in = s0 >= c0 & s0 < c1;
+    dw.start_s  = [dw.start_s,  o.Start + s0(in) / fs];
+    dw.dur_ms   = [dw.dur_ms,   r.dur_ms(in)];
+    dw.fc_hz    = [dw.fc_hz,    r.fc_hz(in)];
+    dw.snr_db   = [dw.snr_db,   r.snr_db(in)];
+    dw.sig_dbfs = [dw.sig_dbfs, r.sig_dbfs(in)];
+    dw.duty     = [dw.duty,     r.duty(in)];
+
+    % ---- noise ------------------------------------------------------------------------
+    m = c1 - c0;
+    Nbw = St / 10^(snr_db / 10);                   % noise power in BW
+    sigma2 = Nbw * fs / bw;                        % total, white over fs
+    noise = single(sqrt(sigma2 / 2)) * complex(randn(rs, m, 1, 'single'), randn(rs, m, 1, 'single'));
+    if o.NoiseBW < fs
+        % band-limited like a receiver's front end: white over |f| < NoiseBW/2, nothing
+        % outside; the density inside, and so the noise in BW, does not change
+        G = fft(noise);
+        fq = (0:m-1)' / m; fq(fq >= 0.5) = fq(fq >= 0.5) - 1;
+        G(abs(fq * fs) > o.NoiseBW / 2) = 0;
+        noise = ifft(G);
+        clear G fq
+    end
+    yk = sig(c0 - r0 + 1:c1 - r0) + noise;
+    clear sig noise
+
+    % keep 10 % headroom: scale signal and noise together, the SNR does not change
+    if isempty(gain)
+        peak = max(abs([real(yk); imag(yk)]));
+        gain = min(1, 0.9 * 32767 / peak);
+        if gain < 1
+            fprintf('Scaled by %.1f dB to fit int16 (white noise over the whole band is loud at low SNR)\n', 20*log10(gain));
+        end
+    end
+    yk = yk * gain;
+    clipped = clipped + nnz(abs(real(yk)) > 32767 | abs(imag(yk)) > 32767);
+    if keep_y, y(c0+1:c1) = yk; end
+
+    if fid > 0
+        q = zeros(2, m, 'int16');
+        q(1, :) = int16(max(min(round(real(yk)), 32767), -32768));
+        q(2, :) = int16(max(min(round(imag(yk)), 32767), -32768));
+        fwrite(fid, q, 'int16');
+        clear q
+    end
+    clear yk
+    if nchunks > 1
+        fprintf('Chunk %d/%d: %.2f..%.2f s, %d dwells\n', k, nchunks, ...
+            o.Start + c0 / fs, o.Start + c1 / fs, nnz(in));
+    end
+end
+if fid > 0, fclose(fid); end
+
+nd = numel(dw.start_s);
 assert(nd > 0, 'no LoRa signal found');
-if snr_db > min(r.snr_db) - 2
+if snr_db > min(dw.snr_db) - 2
     warning('lora_iq_set_snr:floor', ...
         'Requested SNR %.1f dB is close to the recording''s own %.1f dB (min over dwells): the result will be lower.', ...
-        snr_db, min(r.snr_db));
+        snr_db, min(dw.snr_db));
+end
+if clipped
+    warning('lora_iq_set_snr:clipped', '%d samples clipped to int16 after the first chunk.', clipped);
+end
+St = St * gain^2; Nbw = Nbw * gain^2;
+
+info.dwells = dw; info.signal_dbfs = 10*log10(St / fullscale^2);
+info.noise_dbfs_in_bw = 10*log10(Nbw / fullscale^2); info.requested_snr_db = snr_db;
+info.peak = peak * gain; info.gain_db = 20*log10(gain);
+info.chunks = nchunks; info.clipped = clipped;
+fprintf('Signal %.1f dBFS, noise in %.0f kHz %.1f dBFS, SNR %.1f dB\n', ...
+    info.signal_dbfs, bw/1e3, info.noise_dbfs_in_bw, snr_db);
+
+% ---- read back ------------------------------------------------------------------------
+if ~isempty(o.Out)
+    fprintf('Written %s (%.2f s, %.0f MB)\n', o.Out, n/fs, n*4/1e6);
+    if snr_db >= 8       % lora_iq_snr reads within 0.15 dB from 2 dB above its 6 dB threshold
+        chk = lora_iq_snr(o.Out, 'Fs', fs, 'BW', bw, 'Duration', min(n, nc) / fs, 'Plot', false);
+        info.measured_snr_db = chk.snr_db;
+        fprintf('Read back (first %.1f s): SNR median %.1f dB (requested %.1f)\n', ...
+            min(n, nc) / fs, median(chk.snr_db), snr_db);
+    else
+        fprintf('Read-back skipped: SNR too close to the detector''s 6 dB threshold\n');
+    end
+end
 end
 
-% ---- read -----------------------------------------------------------------------------
-n  = round(o.Duration * fs);
-n0 = round(o.Start * fs);
-if isnumeric(file)                                 % samples given directly (int16 units)
-    z = single(file(n0+1:min(end, n0+n)));
-    z = z(:); n = numel(z);
-else
-    fid = fopen(file, 'r'); fseek(fid, n0 * 4, 'bof');
-    raw = fread(fid, [2, n], 'int16=>single'); fclose(fid);
-    n = size(raw, 2);
-    z = complex(raw(1, :), raw(2, :)).'; clear raw
-end
-
-% ---- cut every dwell out, measure its signal power --------------------------------------
+function [pieces, rng_, Sj] = cut_dwells(z, r, fs, bw)
+% Every dwell of R band-passed out of Z with a tapered window; its sample range in Z
+% and its mean power where the signal is on.
+n = numel(z); nd = numel(r.start_s);
 margin = round(100e-6 * fs);                       % room for the filter ends
 taper  = round(100e-6 * fs);
-sig = zeros(n, 1, 'single');
 Sj = zeros(1, nd);
 pieces = cell(1, nd); rng_ = zeros(nd, 2);
 for j = 1:nd
-    a = max(1, round((r.start_s(j) - o.Start) * fs) + 1 - margin);
-    b = min(n, round((r.start_s(j) - o.Start + r.dur_ms(j) * 1e-3) * fs) + margin);
+    a = max(1, round(r.start_s(j) * fs) + 1 - margin);
+    b = min(n, round((r.start_s(j) + r.dur_ms(j) * 1e-3) * fs) + margin);
     seg = z(a:b);
     m = numel(seg);
     win = ones(m, 1, 'single');
@@ -98,58 +213,27 @@ for j = 1:nd
     Sj(j) = mean(pw(hot));
     pieces{j} = s; rng_(j, :) = [a b];
 end
-if isempty(o.SignalDbfs)
-    St = median(Sj);
+end
+
+function n = source_length(file)
+% Samples in FILE (int16 I,Q pairs) or in a sample vector.
+if isnumeric(file)
+    n = numel(file);
 else
-    St = fullscale^2 * 10^(o.SignalDbfs / 10);
+    d = dir(file); assert(~isempty(d), 'cannot open %s', file);
+    n = floor(d.bytes / 4);
 end
-for j = 1:nd
-    sig(rng_(j,1):rng_(j,2)) = sig(rng_(j,1):rng_(j,2)) + pieces{j} * sqrt(St / Sj(j));
-end
-
-% ---- noise ----------------------------------------------------------------------------
-rs = RandStream('mt19937ar', 'Seed', o.Seed);
-Nbw = St / 10^(snr_db / 10);                       % noise power in BW
-sigma2 = Nbw * fs / bw;                            % total, white over fs
-noise = single(sqrt(sigma2 / 2)) * complex(randn(rs, n, 1, 'single'), randn(rs, n, 1, 'single'));
-if o.NoiseBW < fs
-    % band-limited like a receiver's front end: white over |f| < NoiseBW/2, nothing
-    % outside; the density inside, and so the noise in BW, does not change
-    G = fft(noise);
-    fq = (0:n-1)' / n; fq(fq >= 0.5) = fq(fq >= 0.5) - 1;
-    G(abs(fq * fs) > o.NoiseBW / 2) = 0;
-    noise = ifft(G);
-    clear G fq
-end
-y = sig + noise;
-
-% keep 10 % headroom: scale signal and noise together, the SNR does not change
-peak = max(abs([real(y); imag(y)]));
-gain = min(1, 0.9 * 32767 / peak);
-if gain < 1
-    y = y * gain; St = St * gain^2; Nbw = Nbw * gain^2;
-    fprintf('Scaled by %.1f dB to fit int16 (white noise over the whole band is loud at low SNR)\n', 20*log10(gain));
 end
 
-info.dwells = r; info.signal_dbfs = 10*log10(St / fullscale^2);
-info.noise_dbfs_in_bw = 10*log10(Nbw / fullscale^2); info.requested_snr_db = snr_db;
-info.peak = peak * gain; info.gain_db = 20*log10(gain);
-fprintf('Signal %.1f dBFS, noise in %.0f kHz %.1f dBFS, SNR %.1f dB\n', ...
-    info.signal_dbfs, bw/1e3, info.noise_dbfs_in_bw, snr_db);
-
-% ---- write and read back -------------------------------------------------------------
-if ~isempty(o.Out)
-    q = zeros(2, n, 'int16');
-    q(1, :) = int16(max(min(round(real(y)), 32767), -32768));
-    q(2, :) = int16(max(min(round(imag(y)), 32767), -32768));
-    fid = fopen(o.Out, 'w'); fwrite(fid, q, 'int16'); fclose(fid);
-    fprintf('Written %s (%.2f s, %.0f MB)\n', o.Out, n/fs, n*4/1e6);
-    if snr_db >= 8       % lora_iq_snr reads within 0.15 dB from 2 dB above its 6 dB threshold
-        chk = lora_iq_snr(o.Out, 'Fs', fs, 'BW', bw, 'Duration', o.Duration, 'Plot', false);
-        info.measured_snr_db = chk.snr_db;
-        fprintf('Read back: SNR median %.1f dB (requested %.1f)\n', median(chk.snr_db), snr_db);
-    else
-        fprintf('Read-back skipped: SNR too close to the detector''s 6 dB threshold\n');
-    end
+function z = read_samples(file, a, len)
+% LEN samples from sample A (0-based) as a single complex column, int16 units.
+if isnumeric(file)
+    z = single(file(a+1:a+len));
+    z = z(:);
+else
+    fid = fopen(file, 'r'); assert(fid > 0, 'cannot open %s', file);
+    fseek(fid, a * 4, 'bof');
+    raw = fread(fid, [2, len], 'int16=>single'); fclose(fid);
+    z = complex(raw(1, :), raw(2, :)).';
 end
 end

@@ -189,6 +189,7 @@ f = 'IQREC-03-07-26-10h33m43s888.iq';
 r  = lora_iq_snr(f);                          % first second, 40 MS/s
 id = lora_iq_identify(f);                     % one dwell in the first 0.1 s
 y  = lora_iq_set_snr(f, 10, Out='snr10.iq');  % the same packets at 10 dB
+lora_iq_set_snr(f, 10, Out='all10.iq', Duration=Inf);  % whole file, 1 s chunks
 ```
 
 The SNR is in-band, before dechirping, and the levels are dBFS, not dBm.

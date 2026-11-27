@@ -45,6 +45,23 @@ classdef TestIqRecordingTools < matlab.unittest.TestCase
             testCase.verifyEqual(r.snr_db, 15 * ones(1, 5), "AbsTol", 0.3);
         end
 
+        function setSnrInChunksKeepsDwellsWhole(testCase)
+            % 70 ms chunks against ~40 ms hops: most hops cross a chunk border
+            z = lora_iq_synth(40);
+            out = [tempname '.iq'];
+            cleanup = onCleanup(@() delete(out));
+            evalc("[y, info] = lora_iq_set_snr(z, 15, Fs=8e6, Duration=Inf, Chunk=0.07, Out=out);");
+            fid = fopen(out, 'r'); raw = fread(fid, [2 Inf], 'int16=>single'); fclose(fid);
+            r = quiet_snr(complex(raw(1, :), raw(2, :)).', Fs=8e6, Nfft=512, Passband=3.5e6);
+
+            testCase.verifyEmpty(y);
+            testCase.verifyGreaterThan(info.chunks, 2);
+            testCase.verifySize(raw, [2 numel(z)]);
+            testCase.verifyNumElements(info.dwells.start_s, 5, "each hop once in the table");
+            testCase.verifyNumElements(r.snr_db, 5);
+            testCase.verifyEqual(r.snr_db, 15 * ones(1, 5), "AbsTol", 0.3);
+        end
+
         function identifiesAnImplicitHeaderPacket(testCase)
             % ELRS-like: SF7, 500 kHz, preamble 7, implicit header, 8 bytes, CR 4/7
             [z, t] = lora_iq_synth(10);
