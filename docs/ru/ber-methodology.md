@@ -75,6 +75,23 @@ Eb/N0 [dB] = SNRsample [dB] + 10 log10(Ns / SF)
 header/payload symbols на число user payload bits; преамбула не учитывается,
 поскольку начало пакета известно.
 
+### SNR в полосе сигнала
+
+PER-стенд (`board/per/lora_tx_noise`, `tools/lora_detection_model.py`) и
+инструменты для записей (`lora_iq_snr`, `lora_iq_set_snr`) задают SNR в полосе
+сигнала: шум в `BW`, а не во всей полосе дискретизации. Для белого шума два
+определения отличаются только передискретизацией:
+
+```text
+SNR_BW [dB] = SNRsample [dB] + 10 log10(L)     (+9,03 дБ при L = 8, +3,01 дБ при L = 2)
+Es/N0 [dB]  = SNR_BW [dB] + SF × 10 log10(2)
+```
+
+`SNR_BW` не зависит от частоты дискретизации, и порог LoRa-приёмника в нём
+зависит только от SF, а не от BW: SF7 в 125 кГц на стенде и SF7 в 500 кГц в
+записи сравниваются по этой оси напрямую. Модельную кривую перед сравнением со
+стендом или записью пересчитывайте с её собственным `L`.
+
 ## Coded sweep SF5/SF6/SF7
 
 `simulate_coded_ber` строит explicit header, payload CRC, whitening, Hamming

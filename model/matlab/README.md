@@ -192,7 +192,10 @@ y  = lora_iq_set_snr(f, 10, Out='snr10.iq');  % the same packets at 10 dB
 lora_iq_set_snr(f, 10, Out='all10.iq', Duration=Inf);  % whole file, 1 s chunks
 ```
 
-The SNR is in-band, before dechirping, and the levels are dBFS, not dBm.
+The SNR is in the LoRa bandwidth, before dechirping, as on the PER bench; the
+model campaigns give it per sample, 10 log10(Fs/BW) dB lower (see
+[SNR in the signal bandwidth](../../docs/ber-methodology.md#snr-in-the-signal-bandwidth)).
+The levels are dBFS, not dBm.
 `lora_iq_identify` aligns on the preamble and SFD itself, so it assumes neither
 the sync word nor the preamble length. An implicit header leaves the payload
 length ambiguous: it lists the combinations of length, coding rate and CRC that
@@ -218,7 +221,10 @@ packets per point:
 | Detected, % | 0 | 24 | 62 | 84 | 100 | 100 |
 | Decoded with a valid CRC, % | 0 | 1 | 25 | 77 | 99 | 100 |
 
-No false alarms at any point.
+No false alarms at any point. On the same axis the M1 sensitivity sweep for SF7
+(L = 8, CR 4/5, 20 packets per point) acquires 16/20 at -7 dB and 1/20 at
+-9 dB, about 1.5 dB later; the cause (L, payload, 20-packet statistics) is not
+established.
 
 ## BER definitions
 

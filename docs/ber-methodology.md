@@ -75,6 +75,23 @@ stores both converted axes. For the coded experiment, `EbN0_dB` uses the total
 header/payload-symbol energy divided by user payload bits; no preamble is
 included because the experiment starts at a known packet boundary.
 
+### SNR in the signal bandwidth
+
+The PER bench (`board/per/lora_tx_noise`, `tools/lora_detection_model.py`) and
+the recording tools (`lora_iq_snr`, `lora_iq_set_snr`) give the SNR in the
+signal bandwidth instead: the noise in `BW`, not in the whole sample band. For
+white noise the two differ by the oversampling only:
+
+```text
+SNR_BW [dB] = SNRsample [dB] + 10 log10(L)     (+9.03 dB at L = 8, +3.01 dB at L = 2)
+Es/N0 [dB]  = SNR_BW [dB] + SF × 10 log10(2)
+```
+
+`SNR_BW` does not depend on the sample rate, and a LoRa receiver's threshold in
+it depends on SF alone, not on BW: SF7 at 125 kHz on the bench and SF7 at
+500 kHz in a recording compare on this axis directly. Convert a model curve
+with its own `L` before setting it beside bench or recording results.
+
 ## Coded SF5/SF6/SF7 campaign
 
 `simulate_coded_ber` builds the explicit header, payload CRC, whitening,

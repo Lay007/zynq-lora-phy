@@ -55,13 +55,15 @@ does not dilute the reference power.
 
 The sensitivity sweep uses `L=Fs/BW=8`, CR 4/5, a 16-byte payload, and 20
 packets per point. Every row had zero unmatched false-alarm candidates and zero
-duplicate candidates.
+duplicate candidates. The SNR is per sample; the column in BW adds
+10 log10(8) = 9.03 dB and is the axis of the PER bench and the recording tools
+([SNR in the signal bandwidth](ber-methodology.md#snr-in-the-signal-bandwidth)).
 
-| SF | SNR, dB | acquired / 20 | PER |
-|---:|---:|---:|---:|
-| 5 | -14 / -12 / -10 / -8 | 0 / 2 / 18 / 20 | 1 / 0.95 / 0.20 / 0 |
-| 7 | -18 / -16 / -14 / -12 | 1 / 16 / 20 / 20 | 1 / 0.90 / 0 / 0 |
-| 9 | -24 / -22 / -20 / -18 | 0 / 10 / 20 / 20 | 1 / 0.95 / 0.05 / 0 |
+| SF | SNR per sample, dB | SNR in BW, dB | acquired / 20 | PER |
+|---:|---:|---:|---:|---:|
+| 5 | -14 / -12 / -10 / -8 | -5 / -3 / -1 / +1 | 0 / 2 / 18 / 20 | 1 / 0.95 / 0.20 / 0 |
+| 7 | -18 / -16 / -14 / -12 | -9 / -7 / -5 / -3 | 1 / 16 / 20 / 20 | 1 / 0.90 / 0 / 0 |
+| 9 | -24 / -22 / -20 / -18 | -15 / -13 / -11 / -9 | 0 / 10 / 20 / 20 | 1 / 0.95 / 0.05 / 0 |
 
 ![End-to-end LoRa stream sensitivity](images/lora-end-to-end-sensitivity.png)
 
