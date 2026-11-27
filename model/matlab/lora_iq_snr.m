@@ -49,7 +49,7 @@ function r = lora_iq_snr(file, varargin)
 %   full scale reads +3 dBFS).
 %
 %   Example:
-%     r = lora_iq_snr('D:\Programs\ELRS_detector\Signals\IQREC-03-07-26-10h33m43s888.iq');
+%     r = lora_iq_snr('IQREC-03-07-26-10h33m43s888.iq');
 
 p = inputParser;
 addParameter(p, 'Fs', 40e6);
