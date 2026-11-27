@@ -15,9 +15,11 @@ function [y, info] = lora_iq_set_snr(file, snr_db, varargin)
 %     'Duration'    seconds read                                 (1)
 %     'Fs','BW'     as in LORA_IQ_SNR                            (40e6, 500e3)
 %     'Seed'        noise seed                                   (1)
+%     'NoiseBW'     noise bandwidth, Hz: Inf = white over Fs; less limits it to
+%                   |f| < NoiseBW/2, like a receiver's front-end filter    (Inf)
 %
-%   The noise is white over the whole sampling band, as the bench's lora_tx_noise
-%   makes it, and its power in BW is signal / 10^(SNR/10). Y is single complex, scaled
+%   The noise is white over the whole sampling band (or over 'NoiseBW'), as the bench's
+%   lora_tx_noise makes it, and its power in BW is signal / 10^(SNR/10). Y is single complex, scaled
 %   as the file (int16 units); if white noise at a low SNR would overflow int16,
 %   signal and noise are scaled down together (INFO.gain_db). INFO holds the dwell table, the levels and the SNR read
 %   back from the result by LORA_IQ_SNR.
@@ -36,6 +38,7 @@ addParameter(p, 'Duration', 1);
 addParameter(p, 'Fs', 40e6);
 addParameter(p, 'BW', 500e3);
 addParameter(p, 'Seed', 1);
+addParameter(p, 'NoiseBW', Inf);
 parse(p, varargin{:});
 o = p.Results;
 fs = o.Fs; bw = o.BW; fullscale = 32768;
@@ -109,6 +112,15 @@ rs = RandStream('mt19937ar', 'Seed', o.Seed);
 Nbw = St / 10^(snr_db / 10);                       % noise power in BW
 sigma2 = Nbw * fs / bw;                            % total, white over fs
 noise = single(sqrt(sigma2 / 2)) * complex(randn(rs, n, 1, 'single'), randn(rs, n, 1, 'single'));
+if o.NoiseBW < fs
+    % band-limited like a receiver's front end: white over |f| < NoiseBW/2, nothing
+    % outside; the density inside, and so the noise in BW, does not change
+    G = fft(noise);
+    fq = (0:n-1)' / n; fq(fq >= 0.5) = fq(fq >= 0.5) - 1;
+    G(abs(fq * fs) > o.NoiseBW / 2) = 0;
+    noise = ifft(G);
+    clear G fq
+end
 y = sig + noise;
 
 % keep 10 % headroom: scale signal and noise together, the SNR does not change
