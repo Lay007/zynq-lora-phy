@@ -175,7 +175,9 @@ position-error Monte Carlo results.
 
 Four top-level functions handle long int16 I/Q recordings (interleaved I, Q,
 for example 40 MS/s from an SDR) that contain a frequency-hopping LoRa signal.
-Each also takes a complex sample vector instead of a file name.
+Each also takes a complex sample vector instead of a file name. Method,
+accuracy and an example recording:
+[docs/wideband-iq-recordings.md](../../docs/wideband-iq-recordings.md).
 
 | Function | Purpose |
 | --- | --- |

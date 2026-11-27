@@ -25,6 +25,7 @@
 - [Форма ЧМ-сигнала для позиционирования](fm-positioning-waveform-experiment.md)
 - [Послойная differential regression приёмного тракта](stage-differential.md)
 - [Регрессия итоговой ToA на полных пакетах](joint-toa-regression.md)
+- [Широкополосные IQ-записи LoRa с перестройкой частоты](wideband-iq-recordings.md)
 - [Методика дробного ToA и будущей аппаратной калибровки](toa-methodology.md)
 - [End-to-end приёмка MATLAB M1: PHY, ToA и TDoA](matlab-m1-acceptance.md)
 - [Запись пакетов SX1262 с RTL-SDR и PlutoSDR](iq-capture-guide.md)
