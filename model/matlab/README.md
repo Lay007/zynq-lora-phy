@@ -205,6 +205,20 @@ fit the symbol count and keeps the one whose CRC checks, if any.
   word and two modes with the same chirp rate (SF9 at 250 kHz and SF11 at
   500 kHz).
 
+`examples/run_elrs_reference_curve.m` gives the reference against which a
+detector run on such copies can be judged: the stream receiver on packets in the
+mode of the ELRS recording (SF7, 500 kHz, preamble 7, sync word 0x12, CR 4/7),
+white noise, SNR in 500 kHz. It takes about a minute and a half per point at 100
+packets, loads the CPU fully, and saves each point as it finishes. With 100
+packets per point:
+
+| SNR in 500 kHz, dB | -12 | -10 | -9 | -8 | -7 | -6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Detected, % | 0 | 24 | 62 | 84 | 100 | 100 |
+| Decoded with a valid CRC, % | 0 | 1 | 25 | 77 | 99 | 100 |
+
+No false alarms at any point.
+
 ## BER definitions
 
 `simulate_uncoded_ber` compares natural binary labels of transmitted and
